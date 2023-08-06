@@ -5,6 +5,7 @@ Util = require("scripts/util") util = Util
 Event = require('scripts/event')
 Settings = require("scripts/settings")
 Informatron = require('scripts/informatron')
+FloatingMovement = require('scripts/floating_movement')
 Jumppack = require('scripts/jumppack')
 JumppackGraphicsSound = require("scripts/jumppack-graphics-sound")
 --Grapple = require("scripts/grapple")
@@ -12,6 +13,9 @@ JumppackGraphicsSound = require("scripts/jumppack-graphics-sound")
 require('scripts/remote-interface')
 
 Migrate = require('scripts/migrate')
+
+Event.addListener(defines.events.on_tick, FloatingMovement.on_tick)
+-- Run this after on_tick of other mods
 
 function raise_event(event_name, event_data)
   local responses = {}
