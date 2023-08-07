@@ -1,14 +1,14 @@
 
 Version = 0001000 -- 0.1.0
 
-Util = require("scripts/util") util = Util
 Event = require('scripts/event')
+Util = require("scripts/util") util = Util
 Settings = require("scripts/settings")
 Informatron = require('scripts/informatron')
 FloatingMovement = require('scripts/floating_movement')
 Jumppack = require('scripts/jumppack')
 JumppackGraphicsSound = require("scripts/jumppack-graphics-sound")
---Grapple = require("scripts/grapple")
+Grapple = require("scripts/grapple")
 
 require('scripts/remote-interface')
 

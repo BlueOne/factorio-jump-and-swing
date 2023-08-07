@@ -1,2 +1,5 @@
-require("prototypes/phase1/input.lua")
+require("prototypes/input.lua")
 --require("prototypes/phase1/sound.lua")
+require("prototypes/entity/weapon-grappling")
+require("prototypes/item/weapon-grappling")
+require("prototypes/recipe/weapon-grappling")

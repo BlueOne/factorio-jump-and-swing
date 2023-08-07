@@ -44,6 +44,17 @@ Event.trigger = function(event_key, event_data)
   end
 end
 
+function Event.raise(event_key, event_data) 
+  Event.trigger(event_key, event_data)
+  local responses = {}
+  for interface_name, interface_functions in pairs(remote.interfaces) do
+      if interface_functions[event_name] then
+          responses[interface_name] = remote.call(interface_name, event_name, event_data)
+      end
+  end
+  return responses
+end
+
 script.on_init(function(event) Event.trigger("on_init", event) end)
 script.on_load(function(event) Event.trigger("on_load", event) end)
 script.on_configuration_changed(function(event) Event.trigger("on_configuration_changed", event) end)

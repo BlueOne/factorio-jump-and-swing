@@ -16,6 +16,43 @@ util.insert = table.insert
 util.str_gsub = string.gsub
 
 
+
+local function cooldown_on_init(event)
+  global.cooldowns = {}
+end
+Event.addListener("on_init", cooldown_on_init, true)
+
+
+function util.start_cooldown(key, duration)
+  local value = game.tick + duration
+  if global.cooldowns[key] and global.cooldowns[key] < value then global.cooldowns[key] = value end
+end
+
+function util.start_cooldown_player(key, player, duration)
+  if type(player) ~= "number" then player = player.index end
+  key = key..player
+  util.start_cooldown(key, duration)
+end
+
+function util.is_cooldown_active(key)
+  if not global.cooldowns[key] then return false end
+  return global.cooldowns[key] > game.tick
+end
+
+function util.is_cooldown_active_player(key, player)
+  if type(player) ~= "number" then player = player.index end
+  key = key..player
+  util.is_cooldown_active(key)
+end
+
+
+function util.all_wrong(t)
+  for _, v in pairs(t) do
+    if v then return false end
+  end
+  return true
+end
+
 function util.shallow_copy (t) -- shallow-copy a table
     if type(t) ~= "table" then return t end
     local meta = getmetatable(t)
@@ -293,6 +330,10 @@ end
 
 function util.vectors_add(a, b)
     return {x = a.x + b.x, y = a.y + b.y}
+end
+
+function util.vectors_cos_angle(a, b)
+  return util.vector_dot(a, b) / util.vector_length(a) / util.vector_length(b)
 end
 
 function util.lerp_vectors(a, b, alpha)

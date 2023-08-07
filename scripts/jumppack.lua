@@ -1,22 +1,22 @@
 local Jumppack = {}
 
---TODO: interaction with vehicles!
+
+
+--TODO: 
+-- Manual downwards jump should be faster
+-- interaction with vehicles
 
 --{new_unit_number = uint, old_unit_number = uint, new_character = luaEntity, old_character = luaEntity}
 
 Jumppack.name_event = "jumppack"
-Jumppack.thrust_multiplier_before_move = 0.001
 Jumppack.altitude_target = 3
 Jumppack.altitude_base_increase = 0.01
 Jumppack.altitude_percentage_increase = 0.15
 Jumppack.altitude_decrease = 0.3
-Jumppack.jump_base_thrust = 0.15 -- excluding suit thrust
-Jumppack.jump_thrust_multiplier = 5 -- multiplies suit thrust
 Jumppack.toggle_cooldown = 0
 Jumppack.movement_boost_duration = 50
 Jumppack.movement_bonus = 0.5
 Jumppack.movement_fallof_duration = 10
-Jumppack.thrust = 0.01
 
 
 Jumppack.jumppacks_to_add = {}
@@ -60,7 +60,8 @@ function Jumppack.land_and_start_walking(jumppack)
   -- Jump cooldown
   Jumppack.trigger_jump_cooldown(player, Jumppack.toggle_cooldown)
 
-  FloatingMovement.stop_floating(character, true)
+  FloatingMovement.set_source_flag(character, "jumppack", false, true)
+
   global.jumppacks[jumppack.unit_number] = nil
 end
 
@@ -156,10 +157,9 @@ function Jumppack.start_on_character(character, default_state)
   local walking_state = character.walking_state
   local new_character
   if default_state == Jumppack.states.rising or default_state == Jumppack.states.flying then
-    local new_character = FloatingMovement.set_floating(character)
-    if not new_character then return end
-    character = new_character
-    if not FloatingMovement.character_is_flying_version(character.name) then
+    local new_character = FloatingMovement.set_source_flag(character, "jumppack", true)
+    if new_character then 
+      character = new_character 
       Jumppack.trigger_jump_cooldown(player, Jumppack.toggle_cooldown)
     end
   end
@@ -171,18 +171,6 @@ function Jumppack.start_on_character(character, default_state)
     player_index = player.index,
     origin_position = origin_position
   }
-
-  local velocity = {x = 0, y = 0}
-  if walking_state.walking == true then
-    local direction_vector = util.direction_to_vector(walking_state.direction)
-    if direction_vector then
-      direction_vector = util.vector_normalise(direction_vector)
-      local thrust = Jumppack.thrust_multiplier_before_move * Jumppack.thrust
-      local base_thrust = Jumppack.jump_base_thrust + jumppack.character.character_running_speed_modifier * 0.3
-      velocity = util.vector_multiply(direction_vector, (base_thrust + Jumppack.jump_thrust_multiplier * thrust))
-    end
-  end
-  FloatingMovement.get_float_data(character).velocity = velocity
 
   Jumppack.jumppacks_to_add[jumppack.unit_number] = jumppack
   return jumppack
