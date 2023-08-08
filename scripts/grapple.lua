@@ -8,7 +8,7 @@ Grapple.pull_speed = 0.004
 Grapple.pull_speed_per_tick = 0.001 -- increase pull speed over time (for longer distances)
 Grapple.max_orientation_delta_before_disconnect = 0.01 -- In "orientation" 
 Grapple.jetpacking_grapple_duration = 0.01
-Grapple.cooldown_duration = 60
+Grapple.cooldown_duration = 50
 Grapple.hook_duration = 100
 Grapple.cancel_cooldown_duration = 10
 
@@ -16,6 +16,7 @@ Grapple.cancel_cooldown_duration = 10
 -- cooldown
 -- Separate button instead of tied to weapon
 -- import graphics from earendel's mod
+-- upgrade - range 12->20, cooldown 90f->60f
 
 
 -- utils
@@ -51,12 +52,15 @@ end
 
 function Grapple.start_throw(target_position, surface, character)
   local player_index = character.player.index
-  if util.is_cooldown_active_player("grapple", player_index) then return end
   for _, grapple in pairs(global.grapples) do
-    if grapple.character == character then 
+    if grapple.character == character and not grapple.invalid then 
       return
     end
   end
+  if util.is_cooldown_active_player("grapple", player_index) then 
+    return
+  end
+
   util.start_cooldown_player("grapple", player_index, Grapple.cooldown_duration)
   util.start_cooldown_player("grapple_cancel", player_index, Grapple.cancel_cooldown_duration)
 
@@ -158,13 +162,14 @@ function Grapple.on_tick_grapple(grapple)
     local direction = util.vector_normalise(delta)
     local floater = FloatingMovement.from_character(character)
     local velocity = floater.velocity
-    local delta_v = util.vector_multiply(direction, grapple.pull_speed)
-    local v = util.vectors_add(velocity, delta_v)
-    floater.velocity = v
-    -- FloatingMovement module updates position
-    grapple.pull_speed = grapple.pull_speed + Grapple.pull_speed_per_tick
+  
 
-    if not character.valid then return Grapple.destroy(grapple) end
+    local delta_v = util.vector_multiply(direction, grapple.pull_speed)
+    if util.vectors_cos_angle(velocity, direction) < -0.5 then delta_v = util.vector_multiply(delta_v, 5) end
+    local v = util.vectors_add(velocity, delta_v)
+
+    floater.velocity = v
+    grapple.pull_speed = grapple.pull_speed + Grapple.pull_speed_per_tick
 
     -- Stop pull
     local moving_away
@@ -174,7 +179,7 @@ function Grapple.on_tick_grapple(grapple)
       if moving_towards then 
         grapple.moving_towards = true
       end
-      moving_away = util.vectors_cos_angle(walk_direction, delta_v) < -0.5
+      moving_away = util.vectors_cos_angle(walk_direction, direction) < -0.7
     end
 
     if util.vector_length(delta) < 2 * util.vector_length(velocity) or game.tick - grapple.start_pulling_tick > Grapple.hook_duration or (grapple.moving_towards and moving_away) then

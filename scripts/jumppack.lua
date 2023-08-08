@@ -3,7 +3,7 @@ local Jumppack = {}
 
 
 --TODO: 
--- Manual downwards jump should be faster
+-- Action of jump button while already jumping? - airjump, dash, slow-fall
 -- interaction with vehicles
 
 --{new_unit_number = uint, old_unit_number = uint, new_character = luaEntity, old_character = luaEntity}
@@ -13,13 +13,10 @@ Jumppack.altitude_target = 3
 Jumppack.altitude_base_increase = 0.01
 Jumppack.altitude_percentage_increase = 0.15
 Jumppack.altitude_decrease = 0.3
-Jumppack.toggle_cooldown = 0
-Jumppack.movement_boost_duration = 50
-Jumppack.movement_bonus = 0.5
-Jumppack.movement_fallof_duration = 10
-
+Jumppack.jump_cooldown = 0
 
 Jumppack.jumppacks_to_add = {}
+Jumppack.jumppacks_to_delete = {}
 
 
 Jumppack.states = {
@@ -51,18 +48,9 @@ function Jumppack.land_and_start_walking(jumppack)
   local land_character
   local player = character.player
 
-  -- Movement speed
-  if player.character and player.character.valid then
-    global.player_movement_bonus_expire[player.index] = game.tick + Jumppack.movement_boost_duration
-    player.character.character_running_speed_modifier = Jumppack.movement_bonus
-  end
+  util.start_cooldown_player("jump", player, Jumppack.jump_cooldown)
 
-  -- Jump cooldown
-  Jumppack.trigger_jump_cooldown(player, Jumppack.toggle_cooldown)
-
-  FloatingMovement.set_source_flag(character, "jumppack", false, true)
-
-  global.jumppacks[jumppack.unit_number] = nil
+  Jumppack.destroy(jumppack)
 end
 
 
@@ -90,23 +78,20 @@ local function on_tick_stopping(jumppack)
   end
 end
 
-function Jumppack.trigger_jump_cooldown(player, duration)
-  if not player then return end
-  -- Set cooldown only if there's no higher cooldown already in place
-  if not global.player_toggle_cooldown[player.index] or global.player_toggle_cooldown[player.index] < game.tick + Jumppack.toggle_cooldown then
-    global.player_toggle_cooldown[player.index] = game.tick + duration
-  end
+function Jumppack.destroy(jumppack)
+  if jumppack.invalid then return end
+  jumppack.invalid = true
+  table.insert(Jumppack.jumppacks_to_delete, jumppack.unit_number)
+  FloatingMovement.set_source_flag(jumppack.character, "jumppack", false, true)
 end
 
 
 
 function Jumppack.on_tick_jumppack(jumppack)
-
   -- Character died or was destroyed
   if not (jumppack.character and jumppack.character.valid) then
-    FloatingMovement.stop_floating(nil, false, jumppack.unit_number)
-    global.jumppacks[jumppack.unit_number] = nil
-    return JumppackGraphicsSound.cleanup(jumppack)
+    Jumppack.destroy(jumppack)
+    return
   end
 
   local state = jumppack.state
@@ -119,27 +104,19 @@ end
 
 function Jumppack.on_tick(event)
   for _unit_number, jumppack in pairs(global.jumppacks) do
-    Jumppack.on_tick_jumppack(jumppack)
+    if not jumppack.invalid then
+      Jumppack.on_tick_jumppack(jumppack)
+    end
   end
 
   for unit_number, jumppack in pairs(Jumppack.jumppacks_to_add) do
     global.jumppacks[unit_number] = jumppack
   end
   Jumppack.jumppacks_to_add = {}
-
-  -- Movement speed bonus
-  for _, player in pairs(game.connected_players) do
-    if global.player_movement_bonus_expire[player.index] and global.player_movement_bonus_expire[player.index] - game.tick < Jumppack.movement_fallof_duration then
-      if player.character then
-        player.character_running_speed_modifier = player.character_running_speed_modifier - Jumppack.movement_bonus / Jumppack.movement_fallof_duration
-      else
-        global.player_movement_bonus_expire[player.index] = nil
-      end
-    end
-    if global.player_movement_bonus_expire[player.index] and global.player_movement_bonus_expire[player.index] <= game.tick then
-      global.player_movement_bonus_expire[player.index] = nil
-    end
+  for _, unit_number in pairs(Jumppack.jumppacks_to_delete) do
+    global.jumppacks[unit_number] = nil
   end
+  Jumppack.jumppacks_to_delete = {}
 end
 Event.addListener(defines.events.on_tick, Jumppack.on_tick)
 
@@ -160,7 +137,6 @@ function Jumppack.start_on_character(character, default_state)
     local new_character = FloatingMovement.set_source_flag(character, "jumppack", true)
     if new_character then 
       character = new_character 
-      Jumppack.trigger_jump_cooldown(player, Jumppack.toggle_cooldown)
     end
   end
 
@@ -195,38 +171,21 @@ function Jumppack.from_character(character)
   return global.jumppacks[character.unit_number]
 end
 
-
 function Jumppack.stop_jumppack(jumppack)
   jumppack.state = Jumppack.states.stopping
-end
-
-function Jumppack.toggle(character)
-  local jumppack = Jumppack.from_character(character)
-  local state = get_jumppack_state(jumppack)
-
-  if state == Jumppack.states.walking then
-    local pid = character.player.index
-    --if global.player_movement_bonus_expire[pid] then
-    --  return false
-    --end
-
-    Jumppack.start_on_character(character, Jumppack.states.rising)
-    return true
-  else -- rising or flying
-    jumppack.state = Jumppack.states.stopping
-    return false
-  end
 end
 
 function Jumppack.on_jumppack_keypress(event)
   if event.player_index and game.players[event.player_index] and game.players[event.player_index].connected then
     local player = game.players[event.player_index]
-    if player.character then
-      if (not global.player_toggle_cooldown[event.player_index]) or global.player_toggle_cooldown[event.player_index] < game.tick then
-        Jumppack.toggle(player.character)
-      else
-        player.play_sound{path="utility/cannot_build"}
-      end
+    local character = player.character
+    local can_start = character ~= nil
+    can_start = can_start and get_jumppack_state(Jumppack.from_character(character)) == Jumppack.states.walking
+    can_start = can_start and not util.is_cooldown_active_player("jump", player)
+    if can_start then
+      Jumppack.start_on_character(character)
+    else
+      player.play_sound{path="utility/cannot_build"}
     end
   end
 end
@@ -251,6 +210,7 @@ Event.addListener(FloatingMovement.on_character_swapped_event, function (event)
   local old_unit_number = event.old_unit_number
   local jumppack = global.jumppacks[event.old_unit_number]
   if jumppack then
+    if jumppack.invalid then return end
     jumppack.unit_number = event.new_unit_number
     jumppack.character = event.new_character
     global.jumppacks[event.old_unit_number] = nil
@@ -260,8 +220,6 @@ end, true)
 
 function Jumppack.on_init(event)
   global.jumppacks = {}
-  global.player_toggle_cooldown = {}
-  global.player_movement_bonus_expire = {}
 end
 Event.addListener("on_init", Jumppack.on_init, true)
 

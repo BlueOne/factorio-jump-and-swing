@@ -2,6 +2,7 @@
 
 -- Handle animation, rendering, basic physics, data storage of floating
 -- Does not handle control, cooldowns
+-- Provides basic air thrust
 
 FloatingMovement = {}
 
@@ -14,6 +15,7 @@ FloatingMovement.drag = 0.01
 FloatingMovement.brake = 0.001
 
 FloatingMovement.player_thrust = 0.01
+FloatingMovement.thrust_max_speed = 0.6
 
 FloatingMovement.collision_damage = 50
 FloatingMovement.shadow_base_offset = {x = 1, y = 0.1}
@@ -471,8 +473,9 @@ local function movement_tick(floater)
   if walking_state.walking and not floater.disallow_thrust then -- Player is pressing a direction
     local direction_vector = util.direction_to_vector(walking_state.direction)
     direction_vector = util.vector_normalise(direction_vector)
-    local thrust
-    thrust = floater.thrust
+    local speed = util.vector_length(floater.velocity)
+    local multiplier = util.max(0, FloatingMovement.thrust_max_speed - speed)
+    local thrust = floater.thrust * multiplier
     local thrust_vector = {x = direction_vector.x * thrust, y = direction_vector.y * thrust}
     floater.velocity.x = floater.velocity.x + thrust_vector.x
     floater.velocity.y = floater.velocity.y + thrust_vector.y
@@ -536,6 +539,21 @@ function FloatingMovement.on_tick(event)
       end
     end
   end
+
+  for _, player in pairs(game.connected_players) do
+    if player.character then
+      if global.last_float_direction[player.index] then
+        player.character.character_running_speed_modifier = player.character.character_running_speed_modifier * 0.97
+        local last_dir = global.last_float_direction[player.index]
+        if util.vectors_cos_angle(last_dir, util.direction_to_vector(player.character.walking_state.direction)) < 0.5 then
+          player.character.character_running_speed_modifier = player.character.character_running_speed_modifier * 0.9
+        end
+        if player.character.character_running_speed_modifier < 0.05 then
+          global.last_float_direction[player.index] = nil
+        end
+      end
+    end
+  end
 end
 
 
@@ -577,19 +595,31 @@ function FloatingMovement.stop_floating(character, attempt_landing, unit_number)
     end
   end
   
-  
+  local speed = util.vector_length(floater.velocity)
+  local unit_number = character.unit_number
+
+  global.last_float_direction[character.player.index] = util.vector_normalise(floater.velocity)
+
   if FloatingMovement.character_is_flying_version(character.name) then
     local new_character = swap_character_air_ground(character)
     if not new_character then return end
     character = new_character
   end
+
+  character.character_running_speed_modifier = 0
+  local mod = (speed / character.character_running_speed) - 1
+  if mod > 10 then mod = 10 end
+  if mod < 0.5 then mod = 0.5 end
+  character.character_running_speed_modifier = mod
+
   
   cleanup_animation(floater)
-  global.floaters[character.unit_number] = nil
+  global.floaters[unit_number] = nil
 end
 
 function FloatingMovement.on_init(event)
   global.floaters = {}
+  global.last_float_direction = {}
 end
 Event.addListener("on_init", FloatingMovement.on_init, true)
 

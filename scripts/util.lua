@@ -25,7 +25,9 @@ Event.addListener("on_init", cooldown_on_init, true)
 
 function util.start_cooldown(key, duration)
   local value = game.tick + duration
-  if global.cooldowns[key] and global.cooldowns[key] < value then global.cooldowns[key] = value end
+  if not global.cooldowns[key] or global.cooldowns[key] < value then 
+    global.cooldowns[key] = value 
+  end
 end
 
 function util.start_cooldown_player(key, player, duration)
@@ -42,7 +44,7 @@ end
 function util.is_cooldown_active_player(key, player)
   if type(player) ~= "number" then player = player.index end
   key = key..player
-  util.is_cooldown_active(key)
+  return util.is_cooldown_active(key)
 end
 
 
