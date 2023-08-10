@@ -17,11 +17,72 @@ util.str_gsub = string.gsub
 
 
 
+-- layered properties
+-----------------------------------------------------------
+-- properties may be set at multiple "layers", each layer has an identifying order string and properties are looked up in each layer, in the order of the identifying order strings
+
+function util.set_layered_property(data, layer, k, v)
+  if not data[layer] then data[layer] = { } end
+  data[layer][k] = v
+end
+
+function util.set_layered_properties(data, layer, properties)
+  if not data[layer] then data[layer] = { } end
+  for k, v in pairs(properties) do
+    data[layer][k] = v
+  end
+end
+
+function util.get_layered_properties(data, k)
+  local min_layer
+  local v
+  for layer, layer_properties in pairs(data) do
+    if layer_properties[k] ~= nil then
+      if not min_layer or min_layer > layer then
+        min_layer = layer
+        v = layer_properties[k]
+      end
+    end
+  end
+  return v
+end
+
+function util.remove_layer(data, layer)
+  data[layer] = nil
+end
+
+-- Slightly easier remote interfaces
+-----------------------------------------------------------
+
+function util.expose_remote_interface(module, name, function_names)
+  local functions = {}
+  for _, k in pairs(function_names) do
+    local v = module[k]
+    if type(v) == "function" then
+      functions[k] = v
+    end
+  end
+  remote.add_interface(name, functions)
+end
+
+function util.expose_remote_interface_all(module, name)
+  local functions = {}
+  for k, v in pairs(module) do
+    if type(v) == "function" then
+      functions[k] = v
+    end
+  end
+  remote_add_interface(name, functions)
+end
+
+
+-- Cooldowns
+-----------------------------------------------------------
+
 local function cooldown_on_init(event)
   global.cooldowns = {}
 end
 Event.addListener("on_init", cooldown_on_init, true)
-
 
 function util.start_cooldown(key, duration)
   local value = game.tick + duration

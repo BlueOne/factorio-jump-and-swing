@@ -1,1 +1,2 @@
-require("prototypes/phase3/jumppack.lua")
+require("prototypes/jumppack.lua")
+require("prototypes/grappling-gun.lua")

@@ -59,7 +59,70 @@ for _, name in pairs(char_list) do
   remove_shadows_recursive(copy)
   set_render_layer_recursive(copy.animations, "air-object")
   copy.render_layer = "air-object"
-  copy.footstep_particle_triggers = nil
+  copy.footstep_particle_triggers = {{
+    tiles = { "nuclear-ground" },
+    actions =
+    {
+      {
+      type = "create-particle",
+      repeat_count = 7,
+      particle_name = "nuclear-ground-dust-particle",
+      probability = 1,
+      initial_height = 0.1,
+      speed_from_center = 0.01,
+      speed_from_center_deviation = 0,
+      initial_vertical_speed = 0.02,
+      frame_speed = 0.4,
+      initial_vertical_speed_deviation = 0.05,
+      offset_deviation = {{-0.2, -0.2}, {0.2, 0.2}}
+      },
+      {
+      type = "create-particle",
+      repeat_count = 5,
+      particle_name = "nuclear-ground-stone-character-particle-tiny",
+      probability = 1,
+      initial_height = 0.1,
+      speed_from_center = 0.01,
+      speed_from_center_deviation = 0,
+      initial_vertical_speed = 0.01,
+      frame_speed = 0.4,
+      initial_vertical_speed_deviation = 0.05,
+      offset_deviation = {{-0.2, -0.2}, {0.2, 0.2}}
+      }
+    }
+  }}
+  copy.synced_footstep_particle_triggers = {{
+    tiles = { "nuclear-ground" },
+    actions =
+    {
+      {
+      type = "create-particle",
+      repeat_count = 7,
+      particle_name = "nuclear-ground-dust-particle",
+      probability = 1,
+      initial_height = 0.1,
+      speed_from_center = 0.01,
+      speed_from_center_deviation = 0,
+      initial_vertical_speed = 0.02,
+      frame_speed = 0.4,
+      initial_vertical_speed_deviation = 0.05,
+      offset_deviation = {{-0.2, -0.2}, {0.2, 0.2}}
+      },
+      {
+      type = "create-particle",
+      repeat_count = 5,
+      particle_name = "nuclear-ground-stone-character-particle-tiny",
+      probability = 1,
+      initial_height = 0.1,
+      speed_from_center = 0.01,
+      speed_from_center_deviation = 0,
+      initial_vertical_speed = 0.01,
+      frame_speed = 0.4,
+      initial_vertical_speed_deviation = 0.05,
+      offset_deviation = {{-0.2, -0.2}, {0.2, 0.2}}
+      }
+    }
+  }}
   copy.enter_vehicle_distance = 0
   copy.localised_name = {"entity-name.jumppack-character", {"entity-name."..name}}
   copy.flags = copy.flags or {}
@@ -71,8 +134,8 @@ for _, name in pairs(char_list) do
   if not data_util.table_contains(copy.flags, "hidden") then
     table.insert(copy.flags, "hidden")
   end
-  copy.animations.idle = copy.animations.running
-  copy.animations.idle_with_gun = copy.animations.running_with_gun
+  --copy.animations[1].idle = copy.animations[1].running_with_gun
+  --copy.animations[1].idle_with_gun = copy.animations[1].running_with_gun
   -- copy.animations =
   -- {
   --   {

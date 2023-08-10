@@ -1,12 +1,9 @@
 local Jumppack = {}
 
 
-
 --TODO: 
 -- Action of jump button while already jumping? - airjump, dash, slow-fall
--- interaction with vehicles
 
---{new_unit_number = uint, old_unit_number = uint, new_character = luaEntity, old_character = luaEntity}
 
 Jumppack.name_event = "jumppack"
 Jumppack.altitude_target = 3
@@ -40,8 +37,12 @@ local function character_print(character, message)
   end
 end
 
+function Jumppack.is_jumping(character)
+  local state = get_jumppack_state(Jumppack.from_character(character)) 
+  return state ~= Jumppack.states.walking
+end
 
--- Instantly swap to walking state
+-- remove jumping state, trigger cooldown
 function Jumppack.land_and_start_walking(jumppack)
   local surface = jumppack.character.surface
   local character = jumppack.character
@@ -71,7 +72,7 @@ end
 local function on_tick_stopping(jumppack)
   local floater = FloatingMovement.get_float_data(jumppack.character)
   local altitude = floater.altitude
-  if altitude > 0 then
+  if altitude > 0.2 then
     FloatingMovement.add_altitude(jumppack.character, -Jumppack.altitude_decrease)
   else -- Reached the floor
     Jumppack.land_and_start_walking(jumppack)
@@ -82,7 +83,7 @@ function Jumppack.destroy(jumppack)
   if jumppack.invalid then return end
   jumppack.invalid = true
   table.insert(Jumppack.jumppacks_to_delete, jumppack.unit_number)
-  FloatingMovement.set_source_flag(jumppack.character, "jumppack", false, true)
+  FloatingMovement.unset_source_flag(jumppack.character.unit_number, "jumppack", true)
 end
 
 
@@ -134,7 +135,7 @@ function Jumppack.start_on_character(character, default_state)
   local walking_state = character.walking_state
   local new_character
   if default_state == Jumppack.states.rising or default_state == Jumppack.states.flying then
-    local new_character = FloatingMovement.set_source_flag(character, "jumppack", true)
+    local new_character = FloatingMovement.set_source_flag(character, "jumppack")
     if new_character then 
       character = new_character 
     end
@@ -169,6 +170,11 @@ end
 
 function Jumppack.from_character(character)
   return global.jumppacks[character.unit_number]
+end
+
+-- only for remote calls
+function Jumppack.update(jumppack)
+  global.jumppacks[character.unit_number] = jumppack
 end
 
 function Jumppack.stop_jumppack(jumppack)
@@ -222,5 +228,15 @@ function Jumppack.on_init(event)
   global.jumppacks = {}
 end
 Event.addListener("on_init", Jumppack.on_init, true)
+
+
+util.expose_remote_interface(Jumppack, "jumppack_jump", {
+  "is_jumping",
+  "start_on_character",
+  "land_and_start_walking",
+  "destroy",
+  "from_character",
+})
+
 
 return Jumppack
