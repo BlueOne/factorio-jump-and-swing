@@ -5,7 +5,8 @@
 	"author": "unique2",
 	"dependencies": [
     "base >= 1.1.87",
-	"grappling-gun >= 0.3.3"
+	"grappling-gun >= 0.3.3",
+	"stdlib >= 0.1.0"
 	],
 	"description": "Lets you perform a quick jump.",
 	"factorio_version": "1.1"

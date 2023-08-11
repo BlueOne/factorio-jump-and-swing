@@ -1,62 +1,41 @@
-Event = { listeners = {} }
+local Event = require("__stdlib__/stdlib/event/event.lua")
 
--- can add multiple listeners to the same event.
--- event_key can be a uint of native events (defines.events)
--- event_key can be a string for custom input of virtual events
--- if a virtual event is added, set virtual = true
-  -- on_init, on_load, on_configuration_changed get triggered automatically as virtual events
-Event.addListener = function(event_key, add_callback, virtual)
-  if not Event.listeners[event_key] then
-    Event.listeners[event_key] = {}
-    Event.listeners[event_key].callbacks = {}
-    Event.listeners[event_key].sequence = function (event)
-      for _, callback in pairs(Event.listeners[event_key].callbacks) do
-        callback(event)
+function Event.register_custom_event(name, handler, filter, pattern, options)
+  local id = Event.get_event_name(name)
+  if not id then id = Event.generate_event_name(name) end
+  Event.register(id, handler, filter, pattern, options)
+end
+
+function Event.raise_custom_event(name, event_table)
+  local id = Event.get_event_name(name)
+  if not id then error("Custom Event does not exist: "..name) end
+  Event.raise_event(id, event_table)
+end
+
+remote.add_interface(Mod_Prefix.."Event", {
+  get_event_id = Event.get_event_name
+})
+
+-- Not tested. Sorry. 
+-- Call only before on_init
+function Event.register_custom_event_external(event_name, handler, filter, pattern, options)
+  local function deferred_register()
+    local event_id
+    for name, interface in pairs(remote.interfaces) do
+      if interface["get_event_id"] then
+        event_id = remote.call(name, "get_event_id", event_name)
       end
     end
-    if not virtual then -- custom input eventsm only works after on_init
-        script.on_event(event_key, Event.listeners[event_key].sequence)
-    end
-    table.insert(Event.listeners[event_key].callbacks, add_callback)
-  else
-    for _, callback in pairs(Event.listeners[event_key].callbacks) do
-      if callback == add_callback then return end
-    end
-    if not exists then
-      table.insert(Event.listeners[event_key].callbacks, add_callback)
+    if event_id then
+      -- If you are not using stdlib, replace this with script.register(..)
+      Event.register(event_id, handler, filter, pattern, options)
     end
   end
+
+  Event.on_init(deferred_register)
+  Event.on_load(deferred_register)
 end
 
--- can add multiple listneers to the same event.
-Event.removeListener = function(event_key, remove_callback)
-  if not Event.listeners[event_key] then return end
-  for _, callback in pairs(Event.listeners[event_key].callbacks) do
-    if callback == remove_callback then
-      Event.listeners[event_key].callbacks[_] = nil
-    end
-  end
-end
 
-Event.trigger = function(event_key, event_data)
-  if Event.listeners[event_key] then
-    Event.listeners[event_key].sequence(event_data)
-  end
-end
-
-function Event.raise(event_key, event_data) 
-  Event.trigger(event_key, event_data)
-  local responses = {}
-  for interface_name, interface_functions in pairs(remote.interfaces) do
-      if interface_functions[event_name] then
-          responses[interface_name] = remote.call(interface_name, event_name, event_data)
-      end
-  end
-  return responses
-end
-
-script.on_init(function(event) Event.trigger("on_init", event) end)
-script.on_load(function(event) Event.trigger("on_load", event) end)
-script.on_configuration_changed(function(event) Event.trigger("on_configuration_changed", event) end)
 
 return Event

@@ -1,20 +1,24 @@
 
+--[[ 
 
--- Handle animation, rendering, basic physics, basic air thrust of floating
--- Does not handle control, cooldowns
+Floating Movement
+-----------------
+Allow players to move in a flying/floating way. Handle animation, rendering, basic physics, basic air thrust
 
--- A character might be floating due to different reasons such as jumping, grappling. This module is intended as an interface. 
--- Set a character floating via set_source_flag; if they are already floating then there is no need to change the state but we record the flag.
+A character might be floating due to different reasons such as jumping or grappling. This is managed here.
+Set a character floating via set_source_flag; if they are already floating then there is no need to change the state but we record the flag. 
+Set a character not floating via unset_source_flag, if they are still floating due to another reason, they stay floating. 
+--]]
 
 
 -- TODO
+-- Support collision checks
 -- draw character in front of trees
 
 FloatingMovement = {}
 
 FloatingMovement.on_player_soft_revived_event = "on_player_soft_revived"
 --{character : LuaEntity, old_position : MapPosition, new_position : MapPosition}
-FloatingMovement.on_character_swapped_event = "on_character_swapped"
 --{new_unit_number : uint, old_unit_number : uint, new_character : luaEntity, old_character : luaEntity}
 FloatingMovement.name_character_suffix = "-jumppack"
 FloatingMovement.name_floater_shadow = "jumppack-animation-shadow"
@@ -44,7 +48,7 @@ FloatingMovement.bounce_entities = {
 
 function FloatingMovement.is_floating(character)
   if character and character.valid then
-    return global.floaters[character.unit_number] ~= nil
+    return global.floaters[character.unit_number] ~= nil and not global.floaters[character.unit_number].invalid
   else
     return false
   end
@@ -53,7 +57,7 @@ end
 function FloatingMovement.set_source_flag(character, key)
   local floater = FloatingMovement.from_character(character)
   if not floater then 
-    character = FloatingMovement.set_floating(character, attempt_landing)
+    character = FloatingMovement.set_floating(character)
     floater = FloatingMovement.from_character(character)
     floater.source_flags[key] = true
     return character
@@ -63,191 +67,11 @@ function FloatingMovement.set_source_flag(character, key)
 end
 
 
-local function cleanup_animation(floater)
-  if floater.sound and floater.sound.valid then
-    floater.sound.destroy()
-  end
-end
-
-
-local function swap_character(old, new_name)
-  if not game.entity_prototypes[new_name] then error("No entity of type "..new_name.." found! "); return end
-  local buffer_capacity = 1000
-  local position = old.position
-  if not FloatingMovement.character_is_flying_version(new_name) then
-    position = old.surface.find_non_colliding_position(new_name, position, 1, 0.25, false) or position
-  end
-  local new = old.surface.create_entity{
-    name = new_name,
-    position = position,
-    force = old.force,
-    direction = old.direction,
-  }
-  
-  for _, robot in pairs (old.following_robots) do
-    robot.combat_robot_owner = new
-  end
-  
-  new.character_inventory_slots_bonus = old.character_inventory_slots_bonus + buffer_capacity
-  old.character_inventory_slots_bonus = old.character_inventory_slots_bonus + buffer_capacity
-  
-  new.character_running_speed_modifier = old.character_running_speed_modifier
-  
-  new.walking_state = old.walking_state
-  
-  local hand_location
-  if old.player then
-    hand_location = old.player.hand_location
-  end
-  local vehicle = old.vehicle
-  local save_queue = nil
-  local crafting_queue_progress = old.crafting_queue_progress
-  if old.crafting_queue then
-    save_queue = {}
-    for i = old.crafting_queue_size, 1, -1 do
-      if old.crafting_queue and old.crafting_queue[i] then
-        table.insert(save_queue, old.crafting_queue[i])
-        old.cancel_crafting(old.crafting_queue[i])
-      end
-    end
-  end
-  local opened_self = old.player and old.player.opened_self
-  
-  if old.logistic_cell and old.logistic_cell.logistic_network and #old.logistic_cell.logistic_network.robots > 0 then
-    global.robot_collections = global.robot_collections or {}
-    table.insert(global.robot_collections, {character = new, robots = old.logistic_cell.logistic_network.robots})
-  end
-  
-  new.health = old.health
-  new.copy_settings(old)
-  new.selected_gun_index = old.selected_gun_index
-  
-  local limit = old.request_slot_count
-  local i = 1
-  while i <= limit do
-    local slot = old.get_personal_logistic_slot(i)
-    if slot and slot.name then
-      if slot.min then
-        if slot.max then
-          slot.min = math.min(slot.min, slot.max)
-        end
-        slot.min = math.max(0, slot.min)
-      end
-      if slot.max then
-        if slot.min then
-          slot.max = math.max(slot.min, slot.max)
-        end
-        slot.max = math.max(0, slot.max)
-      end
-      new.set_personal_logistic_slot(i, slot)
-    end
-    i = i + 1
-  end
-  new.character_personal_logistic_requests_enabled = old.character_personal_logistic_requests_enabled
-  new.allow_dispatching_robots = old.allow_dispatching_robots
-  
-  --to handle when the cursor is holding the result of a cut or copy.  Which is a blueprint (sort of)
-  local clipboard_blueprint
-  if old.player then
-    if (not old.player.hand_location) and old.player.cursor_stack.is_blueprint and old.player.cursor_stack.valid_for_read then
-      clipboard_blueprint = old.cursor_stack
-    end
-  end
-  
-  if old.player then
-    old.player.set_controller{type=defines.controllers.character, character=new}
-    if opened_self then new.player.opened = new end
-  end
-  
-  -- need to stop inventory overflow when armor is swapped
-  local old_inv = old.get_inventory(defines.inventory.character_armor)
-  if old_inv and old_inv[1] and old_inv[1].valid_for_read then
-    local new_inv = new.get_inventory(defines.inventory.character_armor)
-    new_inv.insert({name = old_inv[1].name, count = 1})
-  end
-  
-  if old.grid then
-    for _, old_eq in pairs(old.grid.equipment) do
-      local new_eq = new.grid.put{name = old_eq.name, position = old_eq.position}
-      if new_eq and new_eq.valid then
-        if old_eq.type == "energy-shield-equipment" then
-          new_eq.shield = old_eq.shield
-        end
-        if old_eq.energy then
-          new_eq.energy = old_eq.energy
-        end
-        if old_eq.burner then
-          for i = 1, #old_eq.burner.inventory do
-            new_eq.burner.inventory.insert(old_eq.burner.inventory[i])
-          end
-          for i = 1, #old_eq.burner.burnt_result_inventory do
-            new_eq.burner.burnt_result_inventory.insert (old_eq.burner.burnt_result_inventory[i])
-          end
-          
-          new_eq.burner.currently_burning = old_eq.burner.currently_burning
-          new_eq.burner.heat = old_eq.burner.heat
-          new_eq.burner.remaining_burning_fuel = old_eq.burner.remaining_burning_fuel
-        end
-      end
-    end
-    new.grid.inhibit_movement_bonus = old.grid.inhibit_movement_bonus
-  end
-  
-  if clipboard_blueprint and clipboard_blueprint.valid_for_read then
-    new.player.clear_cursor()
-    new.player.activate_paste()
-  else
-    new.cursor_stack.swap_stack(old.cursor_stack)
-  end
-  
-  if hand_location then
-    new.player.hand_location = hand_location
-  end
-  
-  --util.swap_entity_inventories(old, new, defines.inventory.character_armor)
-  util.swap_entity_inventories(old, new, defines.inventory.character_main)
-  util.swap_entity_inventories(old, new, defines.inventory.character_guns)
-  util.swap_entity_inventories(old, new, defines.inventory.character_ammo)
-  util.swap_entity_inventories(old, new, defines.inventory.character_trash)
-  
-  if save_queue then
-    for i = #save_queue, 1, -1 do
-      local cci = save_queue[i]
-      if cci then
-        cci.silent = true
-        new.begin_crafting(cci)
-      end
-    end
-    new.crafting_queue_progress = math.min(1, crafting_queue_progress)
-  end
-  new.character_inventory_slots_bonus = new.character_inventory_slots_bonus - buffer_capacity -- needs to be before raise_event
-  
-  Event.raise(FloatingMovement.on_character_swapped_event, {
-    new_unit_number = new.unit_number,
-    old_unit_number = old.unit_number,
-    new_character = new,
-    old_character = old
-  })
-  if old.valid then
-    old.destroy()
-  end
-  if vehicle then
-    if not vehicle.get_driver(new) then
-      vehicle.set_driver(new)
-    elseif not vehicle.get_passenger(new) then
-      vehicle.set_passenger(new)
-    end
-  end
-  
-  return new
-end
-
-
 local function swap_character_air_ground(character)
   if FloatingMovement.character_is_flying_version(character.name) then
-    return swap_character(character, util.replace(character.name, FloatingMovement.name_character_suffix, ""))
+    return util.swap_character(character, util.replace(character.name, FloatingMovement.name_character_suffix, ""))
   else
-    return swap_character(character, character.name .. FloatingMovement.name_character_suffix)
+    return util.swap_character(character, character.name .. FloatingMovement.name_character_suffix)
   end
 end
 
@@ -258,30 +82,29 @@ local function stop_floating(floater, attempt_landing)
   
   if attempt_landing then
     local non_colliding = character.surface.find_non_colliding_position(
-      util.replace(character.name, FloatingMovement.name_character_suffix, ""), -- name
-      character.position, -- center
-      FloatingMovement.landing_collision_snap_radius, --radius
-      0.1, -- precision
+      util.replace(character.name, FloatingMovement.name_character_suffix, ""),
+      character.position, 
+      FloatingMovement.landing_collision_snap_radius, -- radius
+      0.2, -- precision
       false --force_to_tile_center
     )
   
     if non_colliding then 
       character.teleport(non_colliding) 
       local landing_tile = character.surface.get_tile(character.position.x, character.position.y)
-      FloatingMovement.create_land_effects(character, landing_tile, nil, nil, floater.velocity)
+      FloatingMovement.animate_landing(character, landing_tile, nil, nil, floater.velocity)
     else
       local landing_tile = character.surface.get_tile(character.position.x, character.position.y)
-      FloatingMovement.create_land_effects(character, landing_tile, nil, nil, floater.velocity)
+      FloatingMovement.animate_landing(character, landing_tile, nil, nil, floater.velocity)
       
       local position = character.position
       character.teleport(floater.origin_position)
       character.tick_of_last_attack = game.tick
       character.tick_of_last_damage = game.tick
       character.damage(FloatingMovement.collision_damage, "enemy", "physical", character)
-      Event.raise(FloatingMovement.on_player_soft_revived_event, {character = character, old_position = position, new_position = character.position})
+      Event.raise_custom_event(FloatingMovement.on_player_soft_revived_event, {character = character, old_position = position, new_position = character.position})
 
       if not character or not character.valid then -- player death
-        cleanup_animation(floater) 
         global.floaters[floater.unit_number] = nil
         return
       end
@@ -305,8 +128,6 @@ local function stop_floating(floater, attempt_landing)
   if mod < 0.5 then mod = 0.5 end
   character.character_running_speed_modifier = mod
 
-  
-  cleanup_animation(floater)
   global.floaters[unit_number] = nil
 end
 
@@ -354,19 +175,13 @@ function FloatingMovement.is_moving(floater)
   return floater.velocity.x < -0.001 or floater.velocity.x > 0.001 or floater.velocity.y < -0.001 or floater.velocity.y > 0.001
 end
 
-function FloatingMovement.is_floating(character)
-  if character and character.valid then
-    return global.floaters[character.unit_number] ~= nil
-  else
-    return false
-  end
-end
 
 function FloatingMovement.ground_position(character)
   local floater = FloatingMovement.from_character(character)
-  if not floater then error("Taking ground position of a non floating character. ") end
   local pos = character.position
-  return {x = pos.x, y = pos.y + floater.altitude}
+  local altitude = 0
+  if floater then altitude = floater.altitude end
+  return {x = pos.x, y = pos.y + altitude}
 end
 
 function FloatingMovement.add_altitude(character, delta)
@@ -421,7 +236,7 @@ end
 
 local NB_DUST_PUFFS = 14
 local NB_WATER_DROPLETS = 30
-function FloatingMovement.create_land_effects(character, landing_tile, particle_mult, speed_mult, velocity)
+function FloatingMovement.animate_landing(character, landing_tile, particle_mult, speed_mult, velocity)
   local position = character.position
   if not particle_mult then particle_mult = 1 end
   if not speed_mult then speed_mult = 1 end
@@ -462,7 +277,7 @@ function FloatingMovement.set_floating(character)
   local tile = character.surface.get_tile(character.position.x, character.position.y)
 
   if FloatingMovement.no_floating_tiles[tile.name] then
-    character_print(character, {"jumppack.cant_fly_inside"})
+    character.print(character, {"jumppack.cant_fly_inside"})
     return
   end
   
@@ -535,12 +350,14 @@ local function movement_collision_bounce(floater)
 end
 
 
-Event.addListener(FloatingMovement.on_character_swapped_event, function (event)
+Event.register_custom_event(util.on_character_swapped_event, 
+---@param event CharacterSwappedEvent
+function (event)
   if global.last_float_direction[event.old_unit_number] then
     global.last_float_direction[event.new_unit_number] = global.last_float_direction[event.old_unit_number]
     global.last_float_direction[event.old_unit_number] = nil
   end
-end, true)
+end)
 
 
 
@@ -549,7 +366,7 @@ local function movement_tick(floater)
   -- Character died or was destroyed
   if not (character and character.valid) then
     global.floaters[floater.unit_number] = nil
-    return cleanup_animation(floater)
+    return
   end
 
   if not floater.velocity.x then error(serpent.line(floater)) end
@@ -610,39 +427,24 @@ function FloatingMovement.on_tick(event)
     movement_tick(floater)
   end
   
-  -- Re-attach personal construction bots after character swap
-  if global.robot_collections then
-    for k, robot_collection in pairs(global.robot_collections) do
-      if not (robot_collection.character and robot_collection.character.valid) then
-        global.robot_collections[k] = nil
-      elseif robot_collection.character.logistic_cell and robot_collection.character.logistic_cell.valid
-      and robot_collection.character.logistic_cell.logistic_network and robot_collection.character.logistic_cell.logistic_network.valid then
-        for _, robot in pairs(robot_collection.robots) do
-          if robot.valid and robot.surface == robot_collection.character.surface then
-            robot.logistic_network = robot_collection.character.logistic_cell.logistic_network
-          end
-        end
-        global.robot_collections[k] = nil
-      end
-    end
-  end
 
   for _, player in pairs(game.connected_players) do
-    if player.character then
-      local character = player.character
+    local character = player.character
+    if character and character.valid then
       if global.last_float_direction[character.unit_number] and not FloatingMovement.is_floating(character) then
-        character.character_running_speed_modifier = character.character_running_speed_modifier * 0.97
-        local last_dir = global.last_float_direction[character.unit_number]
-        if util.vectors_cos_angle(last_dir, util.direction_to_vector(character.walking_state.direction)) < 0.5 then
-          character.character_running_speed_modifier = character.character_running_speed_modifier * 0.94
-        end
-        -- if not character.walking_state.walking then 
-        --   character.character_running_speed_modifier = 0
-        -- end
-
         if character.character_running_speed_modifier < 0.05 then
           character.character_running_speed_modifier = 0
           global.last_float_direction[character.unit_number] = nil
+        else
+
+          character.character_running_speed_modifier = character.character_running_speed_modifier * 0.97
+          local last_dir = global.last_float_direction[character.unit_number]
+          if util.vectors_cos_angle(last_dir, util.direction_to_vector(character.walking_state.direction)) < 0.5 then
+            character.character_running_speed_modifier = character.character_running_speed_modifier * 0.94
+          end
+        -- if not character.walking_state.walking then 
+        --   character.character_running_speed_modifier = 0
+        -- end
         end
       end
     end
@@ -653,7 +455,7 @@ function FloatingMovement.on_init(event)
   global.floaters = {}
   global.last_float_direction = {}
 end
-Event.addListener("on_init", FloatingMovement.on_init, true)
+Event.register("on_init", FloatingMovement.on_init)
 
 util.expose_remote_interface(FloatingMovement, "jumppack_floating_movement", {
   "is_floating",

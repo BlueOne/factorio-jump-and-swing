@@ -5,7 +5,7 @@ local Jumppack = {}
 -- Action of jump button while already jumping? - airjump, dash, slow-fall
 
 
-Jumppack.name_event = "jumppack"
+Jumppack.jump_key_event = "jumppack"
 Jumppack.altitude_target = 3
 Jumppack.altitude_base_increase = 0.01
 Jumppack.altitude_percentage_increase = 0.15
@@ -119,34 +119,24 @@ function Jumppack.on_tick(event)
   end
   Jumppack.jumppacks_to_delete = {}
 end
-Event.addListener(defines.events.on_tick, Jumppack.on_tick)
+Event.register(defines.events.on_tick, Jumppack.on_tick)
 
 -- Creates a new jumppack object and sets character floating.
--- This method always assumes the character starts from walking state.
--- If the character is walking, set initial velocity
-function Jumppack.start_on_character(character, default_state)
-  default_state = default_state or Jumppack.states.rising
-  local player = character.player
-
-  if not player then return end
-  if character.vehicle or global.disabled_on and global.disabled_on[character.unit_number] then return end
-
+-- Does not check if jumping is allowed, check with Jumppack.can_jump in advance!
+function Jumppack.start_jump(character)
 
   local walking_state = character.walking_state
-  local new_character
-  if default_state == Jumppack.states.rising or default_state == Jumppack.states.flying then
-    local new_character = FloatingMovement.set_source_flag(character, "jumppack")
-    if new_character then 
-      character = new_character 
-    end
+  local player = character.player
+  local new_character = FloatingMovement.set_source_flag(character, "jumppack")
+  if new_character then
+    character = new_character
   end
 
   local jumppack = {
-    state = default_state,
+    state = Jumppack.states.rising,
     character = new_character or character,
     unit_number = new_character and new_character.unit_number or character.unit_number,
     player_index = player.index,
-    origin_position = origin_position
   }
 
   Jumppack.jumppacks_to_add[jumppack.unit_number] = jumppack
@@ -154,48 +144,52 @@ function Jumppack.start_on_character(character, default_state)
 end
 
 
--- function Jumppack.on_player_joined_game(event)
---   local player = game.players[event.player_index]
---   if player and player.connected and player.character then
---     if FloatingMovement.character_is_flying_version(player.character.name) then
---       local character = player.character
---       local jumppack = Jumppack.start_on_character(character, Jumppack.states.flying)
---       if jumppack then
---         jumppack.altitude = Jumppack.altitude_target
---       end
---     end
---   end
--- end
--- Event.addListener(defines.events.on_player_joined_game, Jumppack.on_player_joined_game)
-
 function Jumppack.from_character(character)
   return global.jumppacks[character.unit_number]
 end
 
 -- only for remote calls
 function Jumppack.update(jumppack)
-  global.jumppacks[character.unit_number] = jumppack
+  global.jumppacks[jumppack.unit_number] = jumppack
 end
 
-function Jumppack.stop_jumppack(jumppack)
+function Jumppack.start_fall(jumppack)
   jumppack.state = Jumppack.states.stopping
+end
+
+function Jumppack.can_jump(character)
+  if not character then return false end
+  if get_jumppack_state(Jumppack.from_character(character)) ~= Jumppack.states.walking then return false end
+
+  if util.is_cooldown_active_player("jump", character.player) then return false end
+
+  local position = FloatingMovement.ground_position(character) or character.position
+  local tile = character.surface.get_tile(position)
+  game.print(tile.name)
+  game.print(serpent.line(FloatingMovement.is_floating(character)))
+  local is_water = string.find(tile.name, "water")
+  local is_shallow = string.find(tile.name, "shallow")
+  --game.print("water"..is_water..", shallow"..is_shallow)
+  if (is_water and not is_shallow) then
+    if FloatingMovement.is_floating(character) then
+      return false
+    end
+  end
+  return true
 end
 
 function Jumppack.on_jumppack_keypress(event)
   if event.player_index and game.players[event.player_index] and game.players[event.player_index].connected then
     local player = game.players[event.player_index]
     local character = player.character
-    local can_start = character ~= nil
-    can_start = can_start and get_jumppack_state(Jumppack.from_character(character)) == Jumppack.states.walking
-    can_start = can_start and not util.is_cooldown_active_player("jump", player)
-    if can_start then
-      Jumppack.start_on_character(character)
+    if Jumppack.can_jump(character) then
+      Jumppack.start_jump(character)
     else
       player.play_sound{path="utility/cannot_build"}
     end
   end
 end
-Event.addListener(Jumppack.name_event, Jumppack.on_jumppack_keypress)
+Event.register(Jumppack.jump_key_event, Jumppack.on_jumppack_keypress)
 
 -- As far as I can tell, when flying you can only enter vehicles via scripts.
 -- For example, ironclad.
@@ -209,11 +203,12 @@ function Jumppack.on_player_driving_changed_state(event)
     Jumppack.land_and_start_walking(jumppack)
   end
 end
-script.on_event(defines.events.on_player_driving_changed_state, Jumppack.on_player_driving_changed_state)
+Event.register(defines.events.on_player_driving_changed_state, Jumppack.on_player_driving_changed_state)
 
 
-Event.addListener(FloatingMovement.on_character_swapped_event, function (event)
-  local old_unit_number = event.old_unit_number
+Event.register_custom_event(util.on_character_swapped_event, 
+---@param event CharacterSwappedEvent
+function (event)
   local jumppack = global.jumppacks[event.old_unit_number]
   if jumppack then
     if jumppack.invalid then return end
@@ -222,17 +217,17 @@ Event.addListener(FloatingMovement.on_character_swapped_event, function (event)
     global.jumppacks[event.old_unit_number] = nil
     global.jumppacks[event.new_unit_number] = jumppack
   end
-end, true)
+end)
 
-function Jumppack.on_init(event)
+function Jumppack.on_init()
   global.jumppacks = {}
 end
-Event.addListener("on_init", Jumppack.on_init, true)
+Event.register("on_init", Jumppack.on_init)
 
 
 util.expose_remote_interface(Jumppack, "jumppack_jump", {
   "is_jumping",
-  "start_on_character",
+  "start_jump",
   "land_and_start_walking",
   "destroy",
   "from_character",

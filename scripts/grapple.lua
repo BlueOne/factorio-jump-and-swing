@@ -13,8 +13,6 @@ Grapple.cancel_cooldown_duration = 10
 Grapple.reverse_direction_multiplier = 2
 
 Grapple.to_destroy = {}
--- TODO: 
--- upgrade - stat-upgrade: range 12->20, cooldown 90f->45f, duration 40 -> 60. water-upgrade: allow grapple on water, qol-upgrade: auto-stop-grapple 
 
 
 -- utils
@@ -22,8 +20,6 @@ Grapple.to_destroy = {}
 
 local function lighten_color(color)
   color = util.copy(color)
-  local max = util.max(util.max(color.r, color.g), color.b)
-  local min = util.min(util.min(color.r, color.g), color.b)
   color.r = 0.5 + color.r * 0.2 * 255
   color.g = 0.5 + color.g * 0.2 * 255
   color.b = 0.5 + color.b * 0.2 * 255
@@ -39,18 +35,18 @@ local function draw_line(grapple)
     gap_length = 0.1,
     dash_length = 0.1,
     from = from,
-    from_offset = {0, -1},
+    from_offset = {x=0, y=-1},
     to = to,
-    to_offset = {0, -1},
+    to_offset = {x=0, y=-1},
     surface = from.surface
   }
   grapple.line2 = rendering.draw_line{
     color = {r=0,g=0,b=0,a=1},
     width = 1,
     from = from,
-    from_offset = {0, -1},
+    from_offset = {x=0, y=-1},
     to = to,
-    to_offset = {0, -1},
+    to_offset = {x=0, y=-1},
     surface = from.surface
   }
 end
@@ -78,7 +74,7 @@ function Grapple.update_grapple(grapple)
 end
 
 
--- Begin
+-- Construct
 ------------------------------------------------------------
 
 function Grapple.start_throw(target_position, surface, character)
@@ -152,18 +148,24 @@ function Grapple.on_trigger_created_entity(event)
     end
   end
 end
-Event.addListener(defines.events.on_trigger_created_entity, Grapple.on_trigger_created_entity)
+Event.register(defines.events.on_trigger_created_entity, Grapple.on_trigger_created_entity)
 
 
 function Grapple.on_init(event)
   global.grapples = {}
   global.grapple_id = 0
-  remote.call("freeplay", "set_ship_items", {  
-    ["grappling-gun"] = 1,
-    ["grappling-gun-ammo"] = 200
+  remote.call("freeplay", "set_created_items", {  
+      ["grappling-gun"] = 1,
+      ["grappling-gun-ammo"] = 200,
+      ["iron-plate"] = 8,
+      ["wood"] = 1,
+      ["pistol"] = 1,
+      ["firearm-magazine"] = 10,
+      ["burner-mining-drill"] = 1,
+      ["stone-furnace"] = 1,
 })
 end
-Event.addListener("on_init", Grapple.on_init, true)
+Event.register("on_init", Grapple.on_init)
 
 
 -- Maintain
@@ -176,9 +178,13 @@ function Grapple.on_tick_grapple(grapple)
     -- Throwing Grapple
     grapple.projectile.teleport(util.move_to(grapple.projectile.position, grapple.target_position, grapple.throw_speed))
     grapple.throw_speed = grapple.throw_speed + Grapple.throw_speed_per_tick
-    grapple.projectile.surface.create_trivial_smoke{name="light-smoke", position = util.vectors_add(grapple.projectile.position,{x=0,y=-1})}
+
+    if game.tick % 2 == 0 then
+      grapple.projectile.surface.create_trivial_smoke{name="light-smoke", position = util.vectors_add(grapple.projectile.position,{x=0,y=-1})}
+    end
 
     if util.vectors_delta_length(grapple.projectile.position, grapple.target_position) < 0.01 then
+      -- Begin pulling
       -- local safe_position = grapple.surface.find_non_colliding_position (
       --   character.name, grapple.target_position, Grapple.range / 4, 1, false
       -- )
@@ -186,9 +192,6 @@ function Grapple.on_tick_grapple(grapple)
       --   Grapple.destroy(grapple)
       --   return
       -- else
-      -- Begin pulling
-      --character.destructible = false
-      -- TODO: Make player destructible here, destroy everything if the player dies. 
       grapple.projectile.surface.create_entity{name="explosion-hit", position = util.vectors_add(grapple.projectile.position, {x=0, y=0})}
       grapple.start_pulling_tick = game.tick
 
@@ -231,23 +234,23 @@ function Grapple.on_tick_grapple(grapple)
     floater.velocity = v
     grapple.pull_acceleration = grapple.pull_acceleration + Grapple.pull_acceleration_per_tick
 
-    -- Stop pull
-    local moving_away
-    if character.walking_state.walking then 
-      local walk_direction = util.direction_to_vector(character.walking_state.direction)
-      local moving_towards = util.vectors_cos_angle(walk_direction, direction) > -0.2
-      if moving_towards then 
-        grapple.moving_towards = true
-      end
-      moving_away = util.vectors_cos_angle(walk_direction, direction) < -0.7
-    else 
-      grapple.character.direction = util.orientation_to_direction(util.vector_to_orientation(util.vectors_delta(character.position, grapple.target_position)))
-    end
+    -- Check if moving away or towards
+    -- local moving_away
+    -- if character.walking_state.walking then 
+    --   local walk_direction = util.direction_to_vector(character.walking_state.direction)
+    --   local moving_towards = util.vectors_cos_angle(walk_direction, direction) > -0.2
+    --   if moving_towards then 
+    --     grapple.moving_towards = true
+    --   end
+    --   moving_away = util.vectors_cos_angle(walk_direction, direction) < -0.7
+    -- else 
+    grapple.character.direction = util.orientation_to_direction(util.vector_to_orientation(delta))
+    -- end
     
-
-    if util.vector_length(delta) < 2 * util.vector_length(velocity) or game.tick - grapple.start_pulling_tick > Grapple.hook_duration or (grapple.moving_towards and moving_away) then
-      if not Jumppack.is_jumping(character) then
-        Jumppack.start_on_character(character)
+    -- Stop pull
+    if util.vector_length(delta) < 2 * util.vector_length(velocity) or game.tick - grapple.start_pulling_tick > Grapple.hook_duration --[[or (grapple.moving_towards and moving_away)--]] then
+      if Jumppack.can_jump(character) then
+        Jumppack.start_jump(character)
       end
       Grapple.destroy(grapple)
     end
@@ -271,25 +274,25 @@ function Grapple.on_tick()
     end
   end
   for k, v in pairs(Grapple.to_destroy) do
-    if v == grapple then
-      global.grapples[k] = nil
-    end
+    global.grapples[k] = nil
   end
   Grapple.to_destroy = {}
 end
-Event.addListener(defines.events.on_tick, Grapple.on_tick)
+Event.register(defines.events.on_tick, Grapple.on_tick)
 
 
-Event.addListener(FloatingMovement.on_character_swapped_event, function (event)
+Event.register_custom_event(util.on_character_swapped_event, 
+--@param event CharacterSwappedEvent
+function (event)
   local old_unit_number = event.old_unit_number
-  for k, grapple in pairs(global.grapples) do 
+  for _, grapple in pairs(global.grapples) do
     if not grapple.invalid and grapple.unit_number == old_unit_number then
       grapple.unit_number = event.new_unit_number
       grapple.character = event.new_character
       draw_line(grapple)
     end
   end
-end, true)
+end)
 
 
 -- End
@@ -317,7 +320,6 @@ end
 function Grapple.attempt_cancel_grapple(event)
   if util.is_cooldown_active_player("grapple_cancel", event.player_index) then return end
 
-  if not global.grapples then return end
   local character = game.players[event.player_index].character
   if not character then return end
   local gun_inventory = character.get_inventory(defines.inventory.character_guns)
@@ -347,13 +349,13 @@ function Grapple.on_jumppack_keypress(event)
     local player = game.players[event.player_index]
     local character = player.character
     for _, grapple in pairs(global.grapples) do
-      if grapple.character and grapple.character == character and not grapple.throw then
+      if grapple.character == character and not grapple.throw and Jumppack.can_jump(grapple.character) then
         Grapple.destroy(grapple)
       end
     end
   end
 end
-Event.addListener(Jumppack.name_event, Grapple.on_jumppack_keypress)
+Event.register(Jumppack.jump_key_event, Grapple.on_jumppack_keypress)
 
 function Grapple.on_player_soft_revived(event)
   for _, grapple in pairs(global.grapples) do
@@ -362,7 +364,7 @@ function Grapple.on_player_soft_revived(event)
     end
   end
 end
-Event.addListener(FloatingMovement.on_player_soft_revived_event, Grapple.on_player_soft_revived, true)
+Event.register_custom_event(FloatingMovement.on_player_soft_revived_event, Grapple.on_player_soft_revived)
 
 util.expose_remote_interface(Grapple, "jumppack_grapple", {
   "start_throw",
