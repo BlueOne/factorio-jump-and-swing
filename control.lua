@@ -5,6 +5,8 @@ Mod_Prefix = "jumppack_"
 Event = require("scripts/event")
 --Event = require('scripts/event')
 Util = require("scripts/util") util = Util
+
+MovementConfig = require("scripts/movement_config")
 FloatingMovement = require('scripts/floating_movement')
 Jumppack = require('scripts/jumppack')
 Grapple = require("scripts/grapple")

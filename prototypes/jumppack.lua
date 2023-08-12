@@ -59,70 +59,8 @@ for _, name in pairs(char_list) do
   remove_shadows_recursive(copy)
   set_render_layer_recursive(copy.animations, "air-object")
   copy.render_layer = "air-object"
-  copy.footstep_particle_triggers = {{
-    tiles = { "nuclear-ground" },
-    actions =
-    {
-      {
-      type = "create-particle",
-      repeat_count = 7,
-      particle_name = "nuclear-ground-dust-particle",
-      probability = 1,
-      initial_height = 0.1,
-      speed_from_center = 0.01,
-      speed_from_center_deviation = 0,
-      initial_vertical_speed = 0.02,
-      frame_speed = 0.4,
-      initial_vertical_speed_deviation = 0.05,
-      offset_deviation = {{-0.2, -0.2}, {0.2, 0.2}}
-      },
-      {
-      type = "create-particle",
-      repeat_count = 5,
-      particle_name = "nuclear-ground-stone-character-particle-tiny",
-      probability = 1,
-      initial_height = 0.1,
-      speed_from_center = 0.01,
-      speed_from_center_deviation = 0,
-      initial_vertical_speed = 0.01,
-      frame_speed = 0.4,
-      initial_vertical_speed_deviation = 0.05,
-      offset_deviation = {{-0.2, -0.2}, {0.2, 0.2}}
-      }
-    }
-  }}
-  copy.synced_footstep_particle_triggers = {{
-    tiles = { "nuclear-ground" },
-    actions =
-    {
-      {
-      type = "create-particle",
-      repeat_count = 7,
-      particle_name = "nuclear-ground-dust-particle",
-      probability = 1,
-      initial_height = 0.1,
-      speed_from_center = 0.01,
-      speed_from_center_deviation = 0,
-      initial_vertical_speed = 0.02,
-      frame_speed = 0.4,
-      initial_vertical_speed_deviation = 0.05,
-      offset_deviation = {{-0.2, -0.2}, {0.2, 0.2}}
-      },
-      {
-      type = "create-particle",
-      repeat_count = 5,
-      particle_name = "nuclear-ground-stone-character-particle-tiny",
-      probability = 1,
-      initial_height = 0.1,
-      speed_from_center = 0.01,
-      speed_from_center_deviation = 0,
-      initial_vertical_speed = 0.01,
-      frame_speed = 0.4,
-      initial_vertical_speed_deviation = 0.05,
-      offset_deviation = {{-0.2, -0.2}, {0.2, 0.2}}
-      }
-    }
-  }}
+  --copy.footstep_particle_triggers = {}
+  --copy.synced_footstep_particle_triggers = nil
   copy.enter_vehicle_distance = 0
   copy.localised_name = {"entity-name.jumppack-character", {"entity-name."..name}}
   copy.flags = copy.flags or {}
@@ -201,15 +139,4 @@ data:extend({
   }
 })
 
---     type = "animation",
---     name = "jumppack-animation-shadow",
---     draw_as_shadow = true,
---     filename = "__jumppack__/graphics/entity/character/hr-jumppack-shadow.png",
---     width = 256,
---     height = 256,
---     line_length = 4,
---     shift = util.by_pixel(2,0),
---     direction_count = 1,
---     frame_count = 32,
---     animation_speed = 0.6,
---     scale = 0.5
+

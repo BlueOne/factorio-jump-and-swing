@@ -133,7 +133,11 @@ function util.swap_character(old, new_name)
     "selected_gun_index",
     "walking_state",
     "character_personal_logistic_requests_enabled",
-    "allow_dispatching_robots"
+    "allow_dispatching_robots",
+    "tick_of_last_attack",
+    "tick_of_last_damage",
+    "direction",
+    "orientation"
   }) do
     new[k] = old[k]
   end

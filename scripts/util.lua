@@ -1,6 +1,121 @@
 local util = require("earendel-utils")
 
 
+
+-- Geometry
+-----------------------------------------------------------
+
+
+-- from https://stackoverflow.com/questions/10962379/how-to-check-intersection-between-2-rotated-rectangles
+
+
+function util.doPolygonsIntersect(a,b)
+  local polygons = {a,b}
+  for i=1, #polygons do
+    local polygon = polygons[i]
+    for i1=1, #polygon do
+      local i2 = i1 % #polygon + 1
+      local p1 = polygon[i1]
+      local p2 = polygon[i2]
+      
+      local nx = p2[2] - p1[2]
+      local ny = p1[1] - p2[1]
+      
+      local minA = 1e10
+      local maxA = -1e10
+      for j=1, #a do
+        local projected = nx * a[j][1] + ny * a[j][2]
+        if projected < minA then minA = projected end
+        if projected > maxA then maxA = projected end
+      end
+      
+      local minB = 1e10
+      local maxB = -1e10
+      for j=1, #b do
+        local projected = nx * b[j][1] + ny * b[j][2]
+        if projected < minB then minB = projected end
+        if projected > maxB then maxB = projected end
+      end
+      
+      if maxA < minB or maxB < minA then return false end
+    end
+  end
+  return true
+end
+
+
+function util.rect_to_polygon(r)
+  local x1 = r.left_top.x
+  local y1 = r.left_top.y
+  local x2 = r.right_bottom.x
+  local y2 = r.right_bottom.y
+  local center = util.vectors_add(r.left_top, r.right_bottom)
+  center = util.vector_multiply(center, 0.5)
+  local poly = {{x=x1, y=y1}, {x=x2, y=y1}, {x=x2, y=y2}, {x=x1, y=y2}}
+  for k, v in pairs(poly) do
+    local w = util.vectors_delta(v, center)
+    w = util.rotate_vector(r.orientation or 0, w)
+    w = util.vectors_add(w, center)
+    poly[k] = {w.x, w.y}
+  end
+  return poly
+end
+
+function util.box_normal(rect, position)
+  -- local x1 = rect.left_top.x
+  -- local y1 = rect.left_top.y
+  -- local x2 = rect.right_bottom.x
+  -- local y2 = rect.right_bottom.y
+  local center = util.vectors_add(rect.left_top, rect.right_bottom)
+  center = util.vector_multiply(center, 0.5)
+  -- local poly = {{x=x1, y=y1}, {x=x2, y=y1}, {x=x2, y=y2}, {x=x1, y=y2}}
+  local left_top = util.vectors_delta(rect.left_top, center)
+  local right_bottom = util.vectors_delta(rect.right_bottom, center)
+
+  position = util.vectors_delta(position, center)
+  position = util.rotate_vector(rect.direction or 0, position)
+
+  local function dist(p)
+    local x = math.max(p.x - left_top.x, right_bottom.x - p.x)
+    local y = math.max(p.y - left_top.y, right_bottom.y - p.y)
+    return math.max(x, y)
+  end
+
+  local gradient = {x=0, y=0}
+  for k, offset in pairs({x={x=1, y=0}, y={x=0, y=1}}) do
+    local p = util.vectors_add(position, util.vector_multiply(offset, 1e-4))
+    local p2 = util.vectors_add(position, util.vector_multiply(offset, -1e-4))
+    gradient[k] = (dist(p) - dist(p2)) / 2e-4
+  end
+
+  local v = util.vector_normalise(gradient)
+  -- if util.vector_dot(util.vectors_delta(center, position), v) > 0 then
+  --   v = util.vector_multiply(v, -1)
+  -- end
+  
+  v = util.rotate_vector(-(rect.direction or 0), v)
+
+  return v
+end
+
+
+function util.find_close_noncolliding_position(surface, name, position, max_radius, precision, tile_center)
+  local radius = max_radius / 81
+  local pr = precision / 81
+  for i=1,4 do
+    local p = surface.find_non_colliding_position(name, position, radius, pr, tile_center)
+    if p then return p end
+    radius = radius * 3
+    pr = pr * 3
+  end
+end
+
+function util.do_rects_intersect(r1, r2)
+  local p1 = util.rect_to_polygon(r1)
+  local p2 = util.rect_to_polygon(r2)
+  return util.doPolygonsIntersect(p1, p2)
+end
+
 -- layered properties
 -----------------------------------------------------------
 -- properties may be set at multiple "layers", each layer has an identifying order string and properties are looked up in each layer, in the order of the identifying order strings
@@ -91,6 +206,16 @@ function util.is_cooldown_active_player(key, player)
   key = key..player
   return util.is_cooldown_active(key)
 end
+
+function util.reset_cooldown(key)
+  global.cooldowns[key] = nil
+end
+
+function util.reset_cooldown_player(key, player)
+  if type(player) ~= "number" then player = player.index end
+  global.cooldowns[key..player] = nil
+end
+
 
 
 -- Logic

@@ -23,11 +23,11 @@ FloatingMovement.on_player_soft_revived_event = "on_player_soft_revived"
 FloatingMovement.name_character_suffix = "-jumppack"
 FloatingMovement.name_floater_shadow = "jumppack-animation-shadow"
 FloatingMovement.landing_collision_snap_radius = 3
-FloatingMovement.drag = 0.01
+FloatingMovement.drag = 0 --0.01
 FloatingMovement.brake = 0.001
 
 FloatingMovement.player_thrust = 0.03
-FloatingMovement.thrust_max_speed = 0.3
+FloatingMovement.thrust_max_speed = 0.2
 
 FloatingMovement.collision_damage = 50
 FloatingMovement.shadow_base_offset = {x = 1, y = 0.1}
@@ -45,6 +45,8 @@ FloatingMovement.bounce_entities = {
   "se-spaceship-antimatter-engine",
   "se-spaceship-clamp",
 }
+
+FloatingMovement.collide_with_environment = true
 
 function FloatingMovement.is_floating(character)
   if character and character.valid then
@@ -75,10 +77,20 @@ local function swap_character_air_ground(character)
   end
 end
 
+local function character_name_swapped(character)
+  if FloatingMovement.character_is_flying_version(character.name) then
+    return util.replace(character.name, FloatingMovement.name_character_suffix, "")
+  else
+    return character.name .. FloatingMovement.name_character_suffix
+  end
+end
+
+
 
 local function stop_floating(floater, attempt_landing)
   if not floater then return end
   local character = floater.character
+  local damage
   
   if attempt_landing then
     local non_colliding = character.surface.find_non_colliding_position(
@@ -99,9 +111,7 @@ local function stop_floating(floater, attempt_landing)
       
       local position = character.position
       character.teleport(floater.origin_position)
-      character.tick_of_last_attack = game.tick
-      character.tick_of_last_damage = game.tick
-      character.damage(FloatingMovement.collision_damage, "enemy", "physical", character)
+      damage = FloatingMovement.collision_damage
       Event.raise_custom_event(FloatingMovement.on_player_soft_revived_event, {character = character, old_position = position, new_position = character.position})
 
       if not character or not character.valid then -- player death
@@ -116,11 +126,18 @@ local function stop_floating(floater, attempt_landing)
 
   global.last_float_direction[character.unit_number] = util.vector_normalise(floater.velocity)
 
+  global.floaters[unit_number] = nil
+
   if FloatingMovement.character_is_flying_version(character.name) then
     local new_character = swap_character_air_ground(character)
-    if not new_character then return end
+    if not new_character or not new_character.valid then return end
     character = new_character
   end
+
+  if damage then 
+    character.damage(damage, "neutral", "physical", character)
+  end
+  if not character or not character.valid then return end
 
   character.character_running_speed_modifier = 0
   local mod = (speed / character.character_running_speed) - 1
@@ -128,7 +145,6 @@ local function stop_floating(floater, attempt_landing)
   if mod < 0.5 then mod = 0.5 end
   character.character_running_speed_modifier = mod
 
-  global.floaters[unit_number] = nil
 end
 
 
@@ -394,8 +410,26 @@ local function movement_tick(floater)
       floater.velocity.y = floater.velocity.y * new_speed / speed
     end
   end
+
+
+  local cliff_collision
+  if floater.altitude < 0.2 and FloatingMovement.collide_with_environment then
+    local surface = character.surface
+    local cliffs = surface.find_entities_filtered{position=character.position, radius=5, type="cliff"}
+    for _, e in pairs(cliffs) do
+      cliff_collision = true
+      local intersection = util.do_rects_intersect(character.bounding_box, e.bounding_box)
+      if intersection then
+        local normal = util.box_normal(e.bounding_box, character.position)
+        floater.velocity = util.vector_diff(floater.velocity, util.vector_multiply(normal, util.vector_dot(normal, floater.velocity)))
+      end
+    end
+  end
   
+
+
   local new_position = util.vectors_add(character.position, floater.velocity)
+
   local target_tile = character.surface.get_tile(new_position.x, new_position.y)
   if target_tile then
     local tile_effect = FloatingMovement.no_floating_tiles[target_tile.name]
@@ -411,14 +445,50 @@ local function movement_tick(floater)
         stop_floating(character, false)
       end
     elseif FloatingMovement.is_moving(floater) then
-      character.teleport(new_position)
+      -- Actual Teleport
+      local safe_collide
+      if cliff_collision then
+        safe_collide = util.find_close_noncolliding_position(character.surface, character_name_swapped(character), new_position, 0.5, 0.1, false)
+        if safe_collide then 
+          character.teleport(safe_collide)
+        end
+      end
+      if not safe_collide then 
+        character.teleport(new_position)
+      end
+
+      -- environmental hazards
+      if floater.altitude < 0.2 and util.vector_length(floater.velocity) > 0.2 and FloatingMovement.collide_with_environment then
+        local surface = character.surface
+        local simple_entities = surface.find_entities_filtered{position=new_position, radius=2, type="simple-entity"}
+        local impact = 0
+        for _, e in pairs(simple_entities) do
+          if string.find(e.name, "rock") then
+            e.destroy()
+            impact = impact + 5
+          end
+        end
+        local trees = surface.find_entities_filtered{position=new_position, radius=1, type="tree"}
+        for _, e in pairs(trees) do
+          e.destroy()
+          impact = impact + 1
+        end
+
+        if impact > 0 then
+          character.damage(impact * 5, "neutral", "physical", character)
+          floater.velocity = util.vector_set_length(floater.velocity, math.max(0, util.vector_length(floater.velocity) - impact * 0.2))
+        end
+        
+      end
     end
   else
     floater.velocity.x = floater.velocity.x / 2
     floater.velocity.y = floater.velocity.y / 2
   end
   
-  FloatingMovement.update_graphics(floater)
+  if character and character.valid then 
+    FloatingMovement.update_graphics(floater)
+  end
 end
 
 

@@ -23,3 +23,44 @@ data:extend{
         volume = 0.5
     }
 }
+
+
+
+
+local grapple_tech2 = util.copy(data.raw.technology["grappling-gun"])
+local grapple_tech3 = util.copy(data.raw.technology["grappling-gun"])
+
+grapple_tech2 = util.merge{grapple_tech2, {
+  name = "grappling-gun-2",
+  prerequisites = { "logistics-2", "grappling-gun" },
+  unit = {
+    count = 200,
+    time = 30,
+    ingredients = {
+      { "automation-science-pack", 1 },
+      { "logistic-science-pack", 1 },
+    }
+  },
+}}
+grapple_tech2.effects = nil
+
+
+grapple_tech3 = util.merge{grapple_tech3, {
+  name = "grappling-gun-3",
+  prerequisites = { "chemical-science-pack", "grappling-gun-2" },
+  unit = {
+    count = 200,
+    time = 30,
+    ingredients = {
+      { "automation-science-pack", 1 },
+      { "logistic-science-pack", 1 },
+      { "chemical-science-pack", 1 }
+    }
+  },
+}}
+grapple_tech3.effects = nil
+
+data:extend{
+  grapple_tech2,
+  grapple_tech3,
+}

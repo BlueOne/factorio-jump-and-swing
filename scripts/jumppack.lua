@@ -83,7 +83,7 @@ function Jumppack.destroy(jumppack)
   if jumppack.invalid then return end
   jumppack.invalid = true
   table.insert(Jumppack.jumppacks_to_delete, jumppack.unit_number)
-  FloatingMovement.unset_source_flag(jumppack.character.unit_number, "jumppack", true)
+  FloatingMovement.unset_source_flag(jumppack.unit_number, "jumppack", true)
 end
 
 
@@ -163,17 +163,11 @@ function Jumppack.can_jump(character)
 
   if util.is_cooldown_active_player("jump", character.player) then return false end
 
+  -- Cannot jump on water if floating
   local position = FloatingMovement.ground_position(character) or character.position
   local tile = character.surface.get_tile(position)
-  game.print(tile.name)
-  game.print(serpent.line(FloatingMovement.is_floating(character)))
-  local is_water = string.find(tile.name, "water")
-  local is_shallow = string.find(tile.name, "shallow")
-  --game.print("water"..is_water..", shallow"..is_shallow)
-  if (is_water and not is_shallow) then
-    if FloatingMovement.is_floating(character) then
-      return false
-    end
+  if not MovementConfig.can_jump_colliding(character) and tile.collides_with("player-layer") and FloatingMovement.is_floating(character) then
+    return false
   end
   return true
 end

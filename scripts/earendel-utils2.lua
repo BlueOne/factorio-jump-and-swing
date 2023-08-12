@@ -132,9 +132,14 @@ function util.array_to_vector(array)
     return {x = array[1], y = array[2]}
 end
 
+-- deprecated, use vector_diff instead
 function util.vectors_delta(a, b) -- from a to b
-    if not a and b then return 0 end
-    return {x = b.x - a.x, y = b.y - a.y}
+  if not a and b then return 0 end
+  return {x = b.x - a.x, y = b.y - a.y}
+end
+
+function util.vector_diff(a, b) -- from a to b
+  return {x = a.x - b.x, y = a.y - b.y}
 end
 
 function util.vectors_delta_length(a, b)
