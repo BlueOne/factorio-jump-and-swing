@@ -6,11 +6,8 @@ local Jump = {}
 
 
 Jump.jump_key_event = "jump"
-Jump.altitude_target = 3
-Jump.altitude_base_increase = 0.01
-Jump.altitude_percentage_increase = 0.15
-Jump.altitude_decrease = 0.3
 Jump.jump_cooldown = 0
+Jump.default_jump_speed = 0.4
 
 Jump.jumps_to_add = {}
 Jump.jumps_to_delete = {}
@@ -35,11 +32,19 @@ function Jump.can_jump(character)
   return true
 end
 
+function Jump.instant_land_character(character)
+  if Jump.is_jumping(character) then Jump.instant_landing(Jump.from_character(character)) end
+end
+Event.register_custom_event("on_character_touch_ground", function(event)
+  if event.character and event.character.valid then
+    Jump.instant_land_character(event.character)
+  end
+end)
 
 function Jump.is_jumping(character)
   if not character or not character.valid then return false end
   local jump = Jump.from_character(character)
-  return jump ~= nil and not jump.invalid
+  return jump ~= nil and jump.valid
 end
 
 
@@ -54,57 +59,19 @@ function Jump.instant_landing(jump)
 end
 
 function Jump.destroy(jump)
-  if jump.invalid then return end
-  jump.invalid = true
+  if not jump.valid then return end
+  jump.valid = false
   table.insert(Jump.jumps_to_delete, jump.unit_number)
   FloatingMovement.unset_source_flag(jump.unit_number, "jump", true)
 end
 
-
-
-local function rising_tick(jump)
-  local floater = FloatingMovement.get_float_data(jump.character)
-  local altitude = floater.altitude
-
-  if altitude < Jump.altitude_target then
-    local difference = Jump.altitude_target - altitude
-    local change =  math.min(difference, difference * Jump.altitude_percentage_increase + Jump.altitude_base_increase)
-
-    FloatingMovement.add_altitude(jump.character, change)
-  else
-    jump.rising = false
-  end
-end
-
-local function falling_tick(jump)
-  local floater = FloatingMovement.get_float_data(jump.character)
-  local altitude = floater.altitude
-  if altitude > 0.2 then
-    FloatingMovement.add_altitude(jump.character, -Jump.altitude_decrease)
-  else -- Reached the floor
-    Jump.instant_landing(jump)
-  end
-end
-
-
-function Jump.movement_tick(jump)
-  -- Character died or was destroyed
-  if not (jump.character and jump.character.valid) then
-    Jump.destroy(jump)
-    return
-  end
-
-  if jump.rising then
-    rising_tick(jump)
-  else
-    falling_tick(jump)
-  end -- else is "walking", do nothing
-end
-
 function Jump.on_tick()
   for _, jump in pairs(global.jumps) do
-    if not jump.invalid then
-      Jump.movement_tick(jump)
+    if jump.valid then
+      if not (jump.character and jump.character.valid) then
+        Jump.destroy(jump)
+        return
+      end
     end
   end
 
@@ -120,8 +87,9 @@ end
 Event.register(defines.events.on_tick, Jump.on_tick)
 
 -- Creates a new jump object and sets character floating.
--- Does not check if jumping is allowed, check with Jump.can_jump in advance!
-function Jump.start_jump(character)
+-- Checks if jumping is allowed, if you want to force a jump then pass skip_check
+function Jump.start_jump(character, skip_check)
+  if not skip_check and not Jump.can_jump(character) then return false end
 
   local player = character.player
   local new_character = FloatingMovement.set_source_flag(character, "jump")
@@ -133,13 +101,15 @@ function Jump.start_jump(character)
   end
 
   local jump = {
-    rising = true,
     character = new_character or character,
     unit_number = new_character and new_character.unit_number or character.unit_number,
     player_index = player.index,
+    valid = true
   }
 
   FloatingMovement.set_properties_character(character, "jump", "g", { drag = 0.01 })
+  local floater = FloatingMovement.from_character(character)
+  floater.vel_z = floater.vel_z + Jump.default_jump_speed
 
   Jump.jumps_to_add[jump.unit_number] = jump
   return jump
@@ -154,10 +124,6 @@ end
 -- for remote calls
 function Jump.update(jump)
   global.jumps[jump.unit_number] = jump
-end
-
-function Jump.start_fall(jump)
-  jump.rising = false
 end
 
 
@@ -192,7 +158,7 @@ Event.register_custom_event(util.on_character_swapped_event,
 function (event)
   local jump = global.jumps[event.old_unit_number]
   if jump then
-    if jump.invalid then return end
+    if not jump.valid then return end
     jump.unit_number = event.new_unit_number
     jump.character = event.new_character
     global.jumps[event.old_unit_number] = nil

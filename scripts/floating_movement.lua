@@ -1,32 +1,35 @@
 
---[[ 
 
-Floating Movement
------------------
-Allow players to move in a flying/floating way. Handle animation, rendering, basic physics, basic air thrust
+-- Floating Movement
+-- -----------------
+-- Allow players to move in a flying/floating way. Handle animation, rendering, basic physics, basic air thrust
 
-A character might be floating due to different reasons such as jumping or grappling. This is managed here.
-Set a character floating via set_source_flag; if they are already floating then there is no need to change the state but we record the flag. 
-Set a character not floating via unset_source_flag, if they are still floating due to another reason, they stay floating. 
---]]
+-- A character might be floating due to different reasons such as jumping or grappling. This is managed here.
+-- Set a character floating via set_source_flag; if they are already floating then there is no need to change the state but we record the flag. Set a character not floating via unset_source_flag, if they are still floating due to another reason, they stay floating. 
 
 
--- TODO
--- Support collision checks
--- draw character in front of trees
 
 FloatingMovement = {}
 
-FloatingMovement.on_player_soft_revived_event = "on_player_soft_revived"
+-- Character swapped event see utils.
 --{character : LuaEntity, old_position : MapPosition, new_position : MapPosition}
+
+
+-- Raised when altitude becomes zero. 
+--{character : LuaEntity, position : MapPosition}
+FloatingMovement.on_character_touch_ground = "on_character_touch_ground"
+
+-- Raised when a landing is attempted, but no suitable landing spot is found, for example in water or dense factory areas. 
 --{new_unit_number : uint, old_unit_number : uint, new_character : luaEntity, old_character : luaEntity}
+FloatingMovement.on_player_soft_revived_event = "on_player_soft_revived"
+
 FloatingMovement.name_character_suffix = "-floating"
 FloatingMovement.name_floater_shadow = "jump-and-swing-animation-shadow"
 
 
 FloatingMovement.shadow_base_offset = {x = 1, y = 0.1}
 FloatingMovement.landing_collision_snap_radius = 3
-
+FloatingMovement.default_gravity = -0.02
 
 FloatingMovement.no_floating_tiles = {
   ["out-of-map"] = "bounce",
@@ -154,21 +157,22 @@ end
 
 
 local function stop_floating(floater, attempt_landing, last_key)
-  if not floater then return end
-  local character = floater.character
+  if not floater or not floater.valid or not floater.character or not floater.character.valid then return end
   local damage
-  local surface = character.surface
   floater.valid = false
   
-  if attempt_landing then
+  local unit_number = floater.unit_number
+  local character = floater.character
+  
+  if character and character.valid and attempt_landing then
+    local surface = character.surface
     local non_colliding = surface.find_non_colliding_position(
       util.replace(character.name, FloatingMovement.name_character_suffix, ""),
       character.position, 
       FloatingMovement.landing_collision_snap_radius, -- radius
       0.2, -- precision
-      false --force_to_tile_center
-    )
-  
+    false)
+    
     if non_colliding then 
       character.teleport(non_colliding) 
       local landing_tile = surface.get_tile(character.position.x, character.position.y)
@@ -178,51 +182,54 @@ local function stop_floating(floater, attempt_landing, last_key)
       util.animate_landing(character, landing_tile, nil, nil)
       
       local position = character.position
-      character.teleport(floater.origin_position)
+      character.teleport(floater.safe_position)
       damage = FloatingMovement.get_property_value(floater, "collision_damage")
-
+      
       if not character or not character.valid then -- player death
         global.floaters[floater.unit_number] = nil
         return
       else
         Event.raise_custom_event(FloatingMovement.on_player_soft_revived_event, {unit_number = character.unit_number, character = character, old_position = position, new_position = character.position})
+        if global.bunnyhop_stored_data[character.unit_number] then
+          global.bunnyhop_stored_data[character.unit_number] = nil
+        end
       end
     end
   end
   
-  local speed = util.vector_length(floater.velocity)
-  local unit_number = character.unit_number
-
-  global.last_float_direction[character.unit_number] = util.vector_normalise(floater.velocity)
-
+  
+  global.movement_decay[unit_number] = {character = character, last_float_direction = util.vector_normalise(floater.velocity)}
   global.floaters[unit_number] = nil
-
+  
+  local speed = util.vector_length(floater.velocity)
+  
+  if not character or not character.valid then return end
+  
+  global.bunnyhop_stored_data[unit_number] = {tick=game.tick, velocity = floater.velocity, last_floating_reason=last_key}
   if character_is_flying_version(character.name) then
     local new_character = swap_character_air_ground(character)
     if not new_character or not new_character.valid then return end
     character = new_character
-    if not character_is_flying_version(character.name) then
-      local position = surface.find_non_colliding_position(character.name, character.position, 1, 0.25, false)
-      if position then character.teleport(character.position) end
-    end
+    -- if not character_is_flying_version(character.name) then
+    --   local position = character.surface.find_non_colliding_position(character.name, character.position, 1, 0.25, false)
+    -- if position then character.teleport(character.position) end
+    -- end
   end
-
-  global.stored_character_info[character.unit_number] = {tick=game.tick, velocity = floater.velocity, last_floating_reason=last_key}
-
+  
   if damage then 
     character.damage(damage, "neutral", "physical", character)
   end
   if not character or not character.valid then return end
-
+  
   character.character_running_speed_modifier = 0
   local mod = (speed / character.character_running_speed) - 1
   if mod > 10 then mod = 10 end
   if mod < 0 then mod = 0 end
   character.character_running_speed_modifier = mod
-
+  
 end
 
-
+-- if attempt_landing is set, try to find a non colliding position for the character if it stops floating from this
 function FloatingMovement.unset_source_flag(unit_number, key, attempt_landing)
   local floater = global.floaters[unit_number]
   if not floater or not floater.valid then return end
@@ -276,8 +283,16 @@ function FloatingMovement.add_altitude(character, delta)
   local floater = FloatingMovement.get_float_data(character)
   if not floater then return end
   
-  floater.altitude = floater.altitude + delta
-  floater.character.teleport({x = floater.character.position.x, y = floater.character.position.y - delta})
+  local new_altitude = floater.altitude + delta
+  if new_altitude > 0 then
+    floater.character.teleport({x = floater.character.position.x, y = floater.character.position.y - delta})
+    floater.altitude = new_altitude
+  else
+    floater.character.teleport({x = floater.character.position.x, y = floater.character.position.y + floater.altitude})
+    floater.altitude = 0
+    Event.raise_custom_event("on_character_touch_ground", {character=character, position=character.position, floater = floater})
+    floater.vel_z = 0
+  end
 end
 
 
@@ -315,27 +330,27 @@ function FloatingMovement.set_floating(character, key)
   local surface = character.surface
   local player = character.player
   local force_name = character.force.name
-  local origin_position = character.position
+  local safe_position = character.position
   
   if not player then return end
   if character.vehicle or global.disabled_on and global.disabled_on[character.unit_number] then return end
   local tile = character.surface.get_tile(character.position.x, character.position.y)
-
+  
   if FloatingMovement.no_floating_tiles[tile.name] then
     return
   end
   
-
+  
   local velocity
   local altitude = 0
-  local stv = global.stored_character_info[character.unit_number]
+  local stv = global.bunnyhop_stored_data[character.unit_number]
   if stv ~= nil then
     local allow_bunnyhop = stv.last_floating_reason ~= key
     if game.tick - stv.tick < 5 and allow_bunnyhop then
       velocity = stv.velocity
       velocity = util.vector_multiply(velocity, 0.95)
     end
-    global.stored_character_info[character.unit_number] = nil
+    global.bunnyhop_stored_data[character.unit_number] = nil
   end
   if not velocity then
     if character.walking_state.walking == true then
@@ -348,7 +363,7 @@ function FloatingMovement.set_floating(character, key)
     end
   end
   if not velocity then velocity = {x=0, y=0} end
-
+  
   if not character_is_flying_version(character.name) then
     local new_character = swap_character_air_ground(character)
     if new_character then 
@@ -359,27 +374,29 @@ function FloatingMovement.set_floating(character, key)
       end
     end
   end
-
+  
   local floater = {
     character = character,
     unit_number = character.unit_number,
-    velocity = velocity,
+    velocity = velocity, -- x,y
+    vel_z = 0,
     altitude = altitude,
-    origin_position = origin_position,
+    safe_position = safe_position,
     source_flags = { [key] = true},
     properties = {},
     valid = true
   }
-
+  
   FloatingMovement.set_properties(floater, "default", "z", {
     drag = FloatingMovement.default_drag,
     brake = FloatingMovement.default_brake,
     thrust = FloatingMovement.default_player_thrust,
     thrust_max_speed = FloatingMovement.default_thrust_max_speed,
     collision_damage = FloatingMovement.default_collision_damage,
-    collide_with_environment = MovementConfig.collide_with_environment()
+    collide_with_environment = MovementConfig.collide_with_environment(),
+    gravity = FloatingMovement.default_gravity
   })
-
+  
   global.floaters[character.unit_number] = floater
   return character
 end
@@ -416,9 +433,10 @@ end
 Event.register_custom_event(util.on_character_swapped_event, 
 ---@param event CharacterSwappedEvent
 function (event)
-  if global.last_float_direction[event.old_unit_number] then
-    global.last_float_direction[event.new_unit_number] = global.last_float_direction[event.old_unit_number]
-    global.last_float_direction[event.old_unit_number] = nil
+  if global.movement_decay[event.old_unit_number] then
+    global.movement_decay[event.new_unit_number] = global.movement_decay[event.old_unit_number]
+    global.movement_decay[event.new_unit_number].character = event.new_character
+    global.movement_decay[event.old_unit_number] = nil
   end
 end)
 
@@ -432,7 +450,7 @@ local function movement_tick(floater)
     global.floaters[floater.unit_number] = nil
     return
   end
-
+  
   local drag = FloatingMovement.get_property_value(floater, "drag")
   floater.velocity = util.vector_multiply(floater.velocity, 1-drag)
   
@@ -453,11 +471,11 @@ local function movement_tick(floater)
     if new_speed < 0.001 then
       floater.velocity = {x=0, y=0}
     else
-      floater.veloctiy = util.vector_multiply(floater.velocity, new_speed / speed)
+      floater.velocity = util.vector_multiply(floater.velocity, new_speed / speed)
     end
   end
-
-
+  
+  
   local cliff_collision
   local collide_with_environment = FloatingMovement.get_property_value(floater, "collide_with_environment")
   if floater.altitude < 0.2 and collide_with_environment then
@@ -472,19 +490,20 @@ local function movement_tick(floater)
       end
     end
   end
-
-
+  
+  
   local new_position = util.vectors_add(character.position, floater.velocity)
   local new_ground_position = {x=new_position.x, y = new_position.y + floater.altitude}
-
+  
   local target_tile = character.surface.get_tile(new_ground_position.x, new_ground_position.y)
   if target_tile then
     local tile_effect = FloatingMovement.no_floating_tiles[target_tile.name]
+    -- bounce
     if tile_effect == "bounce" then
       movement_collision_bounce(floater)
     elseif tile_effect == "stop" then
       local bounce_entity = character.surface.find_entities_filtered({name = FloatingMovement.bounce_entities, position = util.tile_to_position(target_tile.position), limit = 1})
-      if #bounce_entity == 1 then -- actually, bounce
+      if #bounce_entity == 1 then
         movement_collision_bounce(floater)
       else
         -- Instant stop
@@ -492,6 +511,12 @@ local function movement_tick(floater)
         stop_floating(character, false)
       end
     elseif FloatingMovement.is_moving(floater) then
+      if not target_tile.collides_with("player-layer") and game.tick%60==0 then
+        local safe_position = character.surface.find_non_colliding_position(FloatingMovement.character_ground_name(character.name), character.position, 2, 0.2, true)
+        if safe_position then 
+          floater.safe_position = safe_position
+        end
+      end
       -- Actual Teleport
       local safe_collide
       if cliff_collision then
@@ -503,7 +528,7 @@ local function movement_tick(floater)
       if not safe_collide then 
         character.teleport(new_position)
       end
-
+      
       -- environmental hazards
       if floater.altitude < 0.2 and util.vector_length(floater.velocity) > 0.2 and collide_with_environment then
         FloatingMovement.collision_with_destructibles(floater, new_position)
@@ -512,6 +537,14 @@ local function movement_tick(floater)
   else
     floater.velocity = util.vector_multiply(floater.velocity, 1/2)
   end
+  
+  if character and character.valid then
+    if floater.altitude > 0 or floater.vel_z > 0 then
+      local gravity = FloatingMovement.get_property_value(floater, "gravity")
+      floater.vel_z = floater.vel_z + gravity
+      FloatingMovement.add_altitude(floater.character, floater.vel_z)
+    end
+  end  
   
   if character and character.valid then 
     FloatingMovement.update_graphics(floater)
@@ -534,10 +567,35 @@ function FloatingMovement.collision_with_destructibles(floater, new_position)
     e.die()
     impact = impact + 1
   end
-
+  
   if impact > 0 then
     character.damage(impact * 5, "neutral", "physical", character)
     floater.velocity = util.vector_set_length(floater.velocity, math.max(0, util.vector_length(floater.velocity) - impact * 0.2))
+  end
+end
+
+
+function FloatingMovement.walk_speed_decay(unit_number, decay_data)
+  if decay_data then 
+    if decay_data.character and decay_data.character.valid then
+      local character = decay_data.character
+      if not FloatingMovement.is_floating(character) then
+        if character.character_running_speed_modifier < 0.05 then
+          character.character_running_speed_modifier = 0
+          global.movement_decay[unit_number] = nil
+        else
+          character.character_running_speed_modifier = character.character_running_speed_modifier * 0.97
+          local last_dir = decay_data.last_float_direction
+          local walk_dir = util.direction_to_vector(character.walking_state.direction)
+          local multiplier = util.vectors_cos_angle(last_dir, walk_dir)
+          if multiplier < 0 then multiplier = 0 end
+          character.character_running_speed_modifier = character.character_running_speed_modifier * multiplier
+          decay_data.last_float_direction = walk_dir
+        end
+      end
+    else
+      global.movement_decay[unit_number] = nil
+    end
   end
 end
 
@@ -547,35 +605,27 @@ function FloatingMovement.on_tick(event)
     movement_tick(floater)
   end
   
-
-  for _, player in pairs(game.connected_players) do
-    local character = player.character
-    if character and character.valid then
-      if global.last_float_direction[character.unit_number] and not FloatingMovement.is_floating(character) then
-        if character.character_running_speed_modifier < 0.05 then
-          character.character_running_speed_modifier = 0
-          global.last_float_direction[character.unit_number] = nil
-        else
-          character.character_running_speed_modifier = character.character_running_speed_modifier * 0.97
-          local last_dir = global.last_float_direction[character.unit_number]
-          local walk_dir = util.direction_to_vector(character.walking_state.direction)
-          local multiplier = util.vectors_cos_angle(last_dir, walk_dir)
-          if multiplier < 0 then multiplier = 0 end
-          character.character_running_speed_modifier = character.character_running_speed_modifier * multiplier
-          global.last_float_direction[character.unit_number] = walk_dir
-        end
-      end
-    end
+  
+  for unit_number, decay_data in pairs(global.movement_decay) do
+    FloatingMovement.walk_speed_decay(unit_number, decay_data)
   end
 end
 -- Not registered here, should be run after on_tick of all modules that want to influence movement. 
 
-function FloatingMovement.on_init(event)
+function FloatingMovement.on_init()
   global.floaters = {}
-  global.last_float_direction = {}
-  global.stored_character_info = {}
+  global.movement_decay = {}
+  global.bunnyhop_stored_data = {}
 end
 Event.register("on_init", FloatingMovement.on_init)
+
+Event.register(defines.events.on_pre_player_died, function(event)
+  local character = game.players[event.player_index].character
+  if character and character.valid then
+    global.movement_decay[character.unit_number] = nil
+    global.bunnyhop_stored_data[character.unit_number] = nil
+  end
+end)
 
 util.expose_remote_interface(FloatingMovement, "jump-and-swing_floating_movement", {
   "is_floating",

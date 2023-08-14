@@ -56,16 +56,21 @@ function Grapple.get_grapples(character)
   return grapples
 end
 
+-- For remote calls, replace the grapple data with the provided data
 function Grapple.update_grapple(grapple)
   global.grapples[grapple.id] = grapple
 end
 
 
+-- Only works if the character has a player attached, for now
 function Grapple.start_throw(target_position, surface, character)
   local player_index = character.player.index
   if util.is_cooldown_active_player("grapple", player_index) then 
     return false
   end
+  
+  if global.grapple_button_hold[player_index] then return false end
+  global.grapple_button_hold[player_index] = true
   
   local range = MovementConfig.grapple_range(character)
   
@@ -143,6 +148,7 @@ function Grapple.on_init()
   global.grapples = {}
   global.grapple_to_destroy = {}
   global.grapple_id = 1
+  global.grapple_button_hold = {}
   if remote.interfaces.freeplay then 
     remote.call("freeplay", "set_respawn_items", {  
       ["grappling-gun"] = 1,
@@ -179,63 +185,54 @@ function Grapple.start_pulling(grapple)
   local character = grapple.character
   local projectile = grapple.projectile
   local surface = grapple.projectile.surface
-  -- local safe_position = grapple.surface.find_non_colliding_position (
-  --   character.name, grapple.target_position, Grapple.range / 4, 1, false
-  -- )
-  -- if not safe_position then 
-  --   Grapple.destroy(grapple)
-  --   return
-  -- else
   
   local range = MovementConfig.grapple_range(character)
   local position = projectile.position
   if not MovementConfig.can_grapple_colliding(character) then
-    position = surface.find_non_colliding_position (
-    FloatingMovement.character_ground_name(character.name), position, range / 4, 1, false
-  )
-end
-
-local function cancel_grapple(grapple)
-  Grapple.destroy(grapple)
-  local player = grapple.player
-  util.reset_cooldown_player("grapple", player)
-  util.start_cooldown_player("grapple", player.index, 10)
-  
-  local selected = character.selected_gun_index
-  local ammo_inventory = character.get_inventory(defines.inventory.character_ammo)
-  
-  local item_stack = ammo_inventory[selected]
-  item_stack.add_ammo(1)
-end
-
-if not position or util.vector_length(util.vectors_delta(position, character.position)) < 2 then
-  cancel_grapple(grapple)
-  return
-end
-
-projectile.surface.create_entity{name="explosion-hit", position = util.vectors_add(projectile.position, {x=0, y=0})}
-grapple.start_pulling_tick = game.tick
-
-local new_character = FloatingMovement.set_source_flag(character, "grapple"..grapple.id)
-if not new_character then
-  character.player.print({"jump-and-swing.cant_fly_here"})
-  cancel_grapple(grapple)
-  return
-end
-
-local redraw
-if character ~= new_character then redraw = true end
-character = new_character or character
-grapple.character = character
-if redraw then draw_line(grapple) end
-
--- Stop any other pulling grapples for this character
-for _, grp in pairs(global.grapples) do
-  if grp.character == grapple.character and not grp.throw then
-    Grapple.destroy(grp)
+    position = surface.find_non_colliding_position (FloatingMovement.character_ground_name(character.name), position, range / 4, 1, false)
   end
-end
-grapple.throw = false
+  
+  local function cancel_grapple(grapple)
+    Grapple.destroy(grapple)
+    local player = grapple.player
+    util.reset_cooldown_player("grapple", player)
+    util.start_cooldown_player("grapple", player.index, 10)
+    
+    local selected = character.selected_gun_index
+    local ammo_inventory = character.get_inventory(defines.inventory.character_ammo)
+    
+    local item_stack = ammo_inventory[selected]
+    item_stack.add_ammo(1)
+  end
+  
+  if not position or util.vector_length(util.vectors_delta(position, character.position)) < 2 then
+    cancel_grapple(grapple)
+    return
+  end
+  
+  projectile.surface.create_entity{name="explosion-hit", position = util.vectors_add(projectile.position, {x=0, y=0})}
+  grapple.start_pulling_tick = game.tick
+  
+  local new_character = FloatingMovement.set_source_flag(character, "grapple"..grapple.id)
+  if not new_character then
+    character.player.print({"jump-and-swing.cant_fly_here"})
+    cancel_grapple(grapple)
+    return
+  end
+  
+  local redraw
+  if character ~= new_character then redraw = true end
+  character = new_character or character
+  grapple.character = character
+  if redraw then draw_line(grapple) end
+  
+  -- Stop any other pulling grapples for this character
+  for _, grp in pairs(global.grapples) do
+    if grp.character == grapple.character and not grp.throw then
+      Grapple.destroy(grp)
+    end
+  end
+  grapple.throw = false
 end
 
 
@@ -245,12 +242,29 @@ function Grapple.pulling_tick(grapple)
     for _, sticker in pairs(character.stickers) do sticker.destroy() end
   end
   
-  local position = FloatingMovement.ground_position(character)
-  local delta = util.vectors_delta(position, grapple.target_position)
-  local direction = util.vector_normalise(delta)
   local floater = FloatingMovement.from_character(character)
   if not floater then error() end
   local velocity = floater.velocity
+  local position = FloatingMovement.ground_position(character)
+  local delta = util.vectors_delta(position, grapple.target_position)
+  local direction = util.vector_normalise(delta)
+
+
+  -- Stop pull
+  local autojump = MovementConfig.autojump(character)
+  local hook_duration_elapsed = game.tick - grapple.start_pulling_tick > MovementConfig.grapple_duration(character)
+  
+  local not_holding_hook_button = character.player and not global.grapple_button_hold[grapple.character.player.index]
+  local close_to_center = util.vector_length(delta) < 2 * util.vector_length(velocity)
+  if hook_duration_elapsed or not_holding_hook_button or close_to_center then
+    local jump = autojump and util.vector_length(velocity) > 0.4 
+    if jump and grapple.character and grapple.character.valid then
+      Jump.start_jump(grapple.character)
+    end
+    Grapple.destroy(grapple)
+    return
+  end
+  
   
   
   local delta_v = util.vector_multiply(direction, grapple.pull_acceleration)
@@ -261,50 +275,31 @@ function Grapple.pulling_tick(grapple)
     multiplier = 0
   end
   delta_v = util.vector_multiply(delta_v, multiplier)
-  local v = util.vectors_add(velocity, delta_v)
+  velocity = util.vectors_add(velocity, delta_v)
   
   local dist = util.vector_length(delta)
   local rel_dist = dist / 5000
   if rel_dist > 2 then rel_dist = 0 end
-  v = util.vector_set_length(v, util.vector_length(v) + rel_dist)
+  velocity = util.vector_set_length(velocity, util.vector_length(velocity) + rel_dist)
   
-  floater.velocity = v
+  floater.velocity = velocity
   grapple.pull_acceleration = grapple.pull_acceleration + Grapple.pull_acceleration_per_tick
   
   -- Check if moving away or towards
-  local moving_away
-  if character.walking_state.walking then 
-    local walk_direction = util.direction_to_vector(character.walking_state.direction)
-    local moving_towards = util.vectors_cos_angle(walk_direction, direction) > -0.2
-    if moving_towards then 
-      grapple.moving_towards = true
-    end
-    moving_away = util.vectors_cos_angle(walk_direction, direction) < -0.3
-  else 
-    grapple.character.direction = util.orientation_to_direction(util.vector_to_orientation(delta))
+  -- local moving_away
+  -- if character.walking_state.walking then 
+  --   local walk_direction = util.direction_to_vector(character.walking_state.direction)
+  --   local moving_towards = util.vectors_cos_angle(walk_direction, direction) > -0.2
+  --   if moving_towards then 
+  --     grapple.moving_towards = true
+  --   end
+  --   moving_away = util.vectors_cos_angle(walk_direction, direction) < -0.3
+  -- else 
+  --   grapple.character.direction = util.orientation_to_direction(util.vector_to_orientation(delta))
+  -- end
   end
-  
-  -- Stop pull
-  
-  local autojump = MovementConfig.autojump(character)
-  local hook_duration_elapsed = game.tick - grapple.start_pulling_tick > MovementConfig.grapple_duration(character)
-  if hook_duration_elapsed or (autojump and (grapple.moving_towards and moving_away) or util.vector_length(delta) < 2 * util.vector_length(velocity)) then
-    if autojump and Jump.can_jump(character) then
-      Jump.start_jump(character)
-    end
-    Grapple.destroy(grapple)
-  end
-end
 
 function Grapple.movement_tick(grapple)
-  -- if grapple.character and grapple.character then
-  --   if game.tick - grapple.start_tick > 2 then 
-  --     if grapple.character.shooting_state.state == defines.shooting.not_shooting then 
-  --       Grapple.destroy(grapple) 
-  --       return
-  --     end
-  --   end
-  -- end
   if grapple.throw then
     Grapple.throwing_tick(grapple)
   else
@@ -323,9 +318,14 @@ function Grapple.check(grapple)
 end
 
 function Grapple.on_tick()
+  for _, player in pairs(game.connected_players) do
+    global.grapple_button_hold[player.index] = global.grapple_button_hold[player.index] and player.character ~= nil and player.character.shooting_state.state ~= defines.shooting.not_shooting
+  end
   for _, grapple in pairs(global.grapples) do
     if Grapple.check(grapple) then
       Grapple.movement_tick(grapple)
+    else
+      Grapple.destroy(grapple)
     end
   end
   for _, v in pairs(global.grapple_to_destroy) do
@@ -357,6 +357,7 @@ end)
 function Grapple.destroy(grapple)
   if grapple.invalid then return end
   grapple.invalid = true
+    
   local new_character
   if grapple.character and grapple.character.valid then
     grapple.character.destructible = true
@@ -388,9 +389,6 @@ Event.register(Jump.jump_key_event, Grapple.on_jump_keypress)
 function Grapple.on_player_soft_revived(event)
   local character = event.character
   if not character or not character.valid then return end
-  if global.stored_character_info[character.unit_number] then
-    global.stored_character_info[character.unit_number].velocity = nil
-  end
   for _, grapple in pairs(global.grapples) do
     if grapple.character and grapple.character == event.character then
       Grapple.destroy(grapple)

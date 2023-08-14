@@ -131,6 +131,7 @@ function util.swap_character(old, new_name)
     "health",
     "selected_gun_index",
     "walking_state",
+    "shooting_state",
     "character_personal_logistic_requests_enabled",
     "allow_dispatching_robots",
     "tick_of_last_attack",

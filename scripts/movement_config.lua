@@ -20,7 +20,7 @@ local function compute_autojump(player)
 end
 
 local function compute_environment_collision()
-  global.MovementConfig.collide_with_environment =settings.global["jump-and-swing_collide-with-environment"].value
+  global.MovementConfig.collide_with_environment = settings.global["jump-and-swing_collide-with-environment"].value
 end
 
 local function player_index(player)
@@ -83,14 +83,14 @@ end
 function MovementConfig.grapple_duration(character)
   local level = level(character)
   local values = {[-1]=30, [0]=30, [1]=40, [2]=40, [3]=50}
-  local multiplier = 1
+  local multiplier = 3
   if not MovementConfig.autojump(character) then multiplier = 3 end
   return values[level] * multiplier
 end
 
 function MovementConfig.grapple_pull_acceleration_threshold(character)
   local level = level(character)
-  local values = {[-1]=0.4, [0]=0.4, [1]=0.5, [2]=0.7, [3]=2}
+  local values = {[-1]=0.4, [0]=0.4, [1]=0.5, [2]=1, [3]=2}
   return values[level]
 end
 
