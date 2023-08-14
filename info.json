@@ -1,13 +1,13 @@
 {
-	"name": "jumppack",
+	"name": "jump-and-swing",
 	"version": "0.1.0",
-	"title": "Jumppack",
+	"title": "Jump and Swing",
 	"author": "unique2",
 	"dependencies": [
     "base >= 1.1.87",
 	"grappling-gun >= 0.3.3",
 	"stdlib >= 0.1.0"
 	],
-	"description": "Lets you perform a quick jump.",
+	"description": "Add a jump button and a reworked grappling hook. ",
 	"factorio_version": "1.1"
 }

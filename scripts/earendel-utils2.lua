@@ -1,7 +1,7 @@
 
 -- License: Earendel FMLDOL 
 -- https://docs.google.com/document/d/1z-6hZQekEHOu1Pk4z-V5LuwlHnveFLJGTjVAtjYHwMU
--- Copied and modified by unique2 with permission from earendel
+-- Modified by unique2 with permission from earendel
 
 
 function util.shallow_copy (t) -- shallow-copy a table
@@ -445,7 +445,12 @@ function util.format_energy(fuel, ceil)
   end
 end
 
-function util.direction_to_vector (direction)
+
+function util.direction_to_vector(direction)
+  return util.vector_normalise(util.direction_to_vector_unnormalised(direction))
+end
+
+function util.direction_to_vector_unnormalised (direction)
   if direction == defines.direction.east then return {x=1,y=0} end
   if direction == defines.direction.north then return {x=0,y=-1} end
   if direction == defines.direction.northeast then return {x=1,y=-1} end

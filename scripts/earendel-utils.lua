@@ -1,7 +1,7 @@
 
 -- License: Earendel FMLDOL 
 -- https://docs.google.com/document/d/1z-6hZQekEHOu1Pk4z-V5LuwlHnveFLJGTjVAtjYHwMU
--- Copied and modified by unique2 with permission from earendel
+-- Modified by unique2 with permission from earendel
 
 local util = require("__core__/lualib/util.lua")
 
@@ -97,13 +97,12 @@ end
 
 util.on_character_swapped_event = "on_character_swapped"
 
+
 -- TODO: Put this back the way it was.
+-- Does not check if the target location is safe to spawn the new character, if collision masks change. 
 function util.swap_character(old, new_name)
   if not game.entity_prototypes[new_name] then error("No entity of type "..new_name.." found! "); return end
   local position = old.position
-  if not FloatingMovement.character_is_flying_version(new_name) then
-    position = old.surface.find_non_colliding_position(new_name, position, 1, 0.25, false) or position
-  end
   local new = old.surface.create_entity{
     name = new_name,
     position = position,
@@ -183,9 +182,9 @@ function util.swap_character(old, new_name)
       end
     end
   end
-  
-  
-  
+
+
+
   if old.player then
     old.player.set_controller{type=defines.controllers.character, character=new}
     if opened_self then new.player.opened = new end
@@ -380,6 +379,55 @@ function util.swap_inventories(inv_a, inv_b)
     inv_b[i].swap_stack(inv_a[i])
   end
 end
+
+
+
+-- Graphics
+------------------------------------------------------------
+
+function util.create_particle_circle(surface, position, nb_particles, particle_name, particle_speed)
+  for orientation=0, 1, 1/nb_particles do
+    local fuzzed_orientation = orientation + math.random() * 0.1
+    local vector = util.orientation_to_vector(fuzzed_orientation, particle_speed)
+    -- local v = util.copy(vector)
+    -- if velocity and util.vector_length(velocity) > 0.01 then v = util.vectors_add(vector, util.vector_multiply(velocity, 1)) end
+
+    surface.create_particle{
+      name = particle_name,
+      position = util.vectors_add(position, vector),
+      movement = vector,
+      height = 0.2,
+      vertical_speed = 0.1,
+      frame_speed = 0.4
+    }
+  end
+end
+
+local NB_DUST_PUFFS = 14
+local NB_WATER_DROPLETS = 30
+function util.animate_landing(character, landing_tile, particle_mult, speed_mult)
+  local position = character.position
+  if not particle_mult then particle_mult = 1 end
+  if not speed_mult then speed_mult = 1 end
+  
+  if string.find(landing_tile.name, "water", 1, true) then
+    -- Water splash
+    util.create_particle_circle(character.surface, position, NB_WATER_DROPLETS * particle_mult, "water-particle", 0.05 * speed_mult)
+    character.surface.play_sound({path="tile-walking/water-shallow", position=position})
+  else
+    -- Dust
+    local particle_name = landing_tile.name .. "-dust-particle"
+    if not game.particle_prototypes[particle_name] then
+      particle_name = "sand-1-dust-particle"
+    end
+    util.create_particle_circle(character.surface, position, NB_DUST_PUFFS * particle_mult, particle_name, 0.1 * speed_mult)
+    local sound_path = "tile-walking/"..landing_tile.name
+    if game.is_valid_sound_path(sound_path) then
+      character.surface.play_sound({path=sound_path, position=position})
+    end
+  end
+end
+
 
 
 return util

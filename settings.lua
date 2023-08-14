@@ -1,10 +1,14 @@
-data:extend{
-  {
-    type = "int-setting",
-    name = "jumppack-volume",
-    setting_type = "startup",
-    min_value = 0,
-    default_value = 30,
-    max_value = 100,
-  },
-}
+data:extend({
+    {
+        type = "bool-setting",
+        name = "jump-and-swing_autojump",
+        setting_type = "runtime-per-user",
+        default_value = true
+    }, 
+    {
+        type = "bool-setting",
+        name = "jump-and-swing_collide-with-environment",
+        setting_type = "runtime-global",
+        default_value = true
+    }
+})

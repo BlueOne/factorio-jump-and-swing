@@ -6,9 +6,7 @@ local util = require("earendel-utils")
 -----------------------------------------------------------
 
 
--- from https://stackoverflow.com/questions/10962379/how-to-check-intersection-between-2-rotated-rectangles
-
-
+-- doPolygonsIntersect is taken from https://stackoverflow.com/questions/10962379/how-to-check-intersection-between-2-rotated-rectangles
 function util.doPolygonsIntersect(a,b)
   local polygons = {a,b}
   for i=1, #polygons do
@@ -61,14 +59,10 @@ function util.rect_to_polygon(r)
   return poly
 end
 
+-- not quite tested
 function util.box_normal(rect, position)
-  -- local x1 = rect.left_top.x
-  -- local y1 = rect.left_top.y
-  -- local x2 = rect.right_bottom.x
-  -- local y2 = rect.right_bottom.y
   local center = util.vectors_add(rect.left_top, rect.right_bottom)
   center = util.vector_multiply(center, 0.5)
-  -- local poly = {{x=x1, y=y1}, {x=x2, y=y1}, {x=x2, y=y2}, {x=x1, y=y2}}
   local left_top = util.vectors_delta(rect.left_top, center)
   local right_bottom = util.vectors_delta(rect.right_bottom, center)
 
@@ -88,13 +82,8 @@ function util.box_normal(rect, position)
     gradient[k] = (dist(p) - dist(p2)) / 2e-4
   end
 
-  local v = util.vector_normalise(gradient)
-  -- if util.vector_dot(util.vectors_delta(center, position), v) > 0 then
-  --   v = util.vector_multiply(v, -1)
-  -- end
-  
+  local v = util.vector_normalise(gradient)  
   v = util.rotate_vector(-(rect.direction or 0), v)
-
   return v
 end
 
@@ -118,21 +107,37 @@ end
 
 -- layered properties
 -----------------------------------------------------------
--- properties may be set at multiple "layers", each layer has an identifying order string and properties are looked up in each layer, in the order of the identifying order strings
+-- This is a data structure which may save values for the same property in different ordered layers, and a lookup returns the value of the property in the first layer that sets it. 
+-- Each layer has an identifying key and an order string.
+-- This data structure probably has a name ...
 
-function util.set_layered_property(data, layer, k, v)
-  if not data[layer] then data[layer] = { } end
-  data[layer][k] = v
+function util.set_layered_property(data, layer_name, key, k, v)
+  layer_name = layer_name .. key
+  if not data[layer_name] then data[layer_name] = {_key = key} end
+  data[layer_name][k] = v
 end
 
-function util.set_layered_properties(data, layer, properties)
-  if not data[layer] then data[layer] = { } end
+function util.set_layered_properties(data, layer_name, key, properties)
+  layer_name = layer_name .. key
+  if not data[layer_name] then data[layer_name] =  {_key = key} end
   for k, v in pairs(properties) do
-    data[layer][k] = v
+    data[layer_name][k] = v
   end
 end
 
-function util.get_layered_properties(data, k)
+function util.unset_layered_properties(data, key)
+  local to_delete = {}
+  for k, layer in pairs(data) do
+    if layer._key == key then
+      table.insert(to_delete, k)
+    end
+  end
+  for _, k in pairs(to_delete) do
+    data[k] = nil
+  end
+end
+
+function util.get_layered_properties_value(data, k)
   local min_layer
   local v
   for layer, layer_properties in pairs(data) do
@@ -146,9 +151,6 @@ function util.get_layered_properties(data, k)
   return v
 end
 
-function util.remove_layer(data, layer)
-  data[layer] = nil
-end
 
 -- Slightly easier remote interfaces
 -----------------------------------------------------------
