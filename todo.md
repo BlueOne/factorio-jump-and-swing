@@ -1,20 +1,25 @@
+
 TODO
 =====
-
-* Promote swinging more.
-  * asd
-  * fgh
-
-* TODO: MP Test
-* Jumping is slightly buggy upon landing ...
 
 Post Release Todos
 ------------------
 
+Gameplay/Animation Details
+
+* Play slow walk animation when grappling
+* Water animation
+* Water hook projectile animation
+* Rework cliffs
+* Landing Bug
+* Add Coyote time for pressing jump just before landing
+* Handle script_raised_teleport
+* Player damage upon cliff collision
+* Landing in water bug
+
+Design
+
+* Promote swinging more.
 * collision with biter bases?
-* player damage upon collision with cliffs, rework cliff collision
-
 * Tips and Tricks UI page
-
 * Idea: no friction only when pressing direction
-* Animate flying grapple (in water)

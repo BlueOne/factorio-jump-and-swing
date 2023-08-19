@@ -6,7 +6,9 @@
 	"dependencies": [
     "base >= 1.1.87",
 	"grappling-gun >= 0.3.3",
-	"stdlib >= 0.1.0"
+	"stdlib >= 0.1.0",
+	"!jetpack",
+	"!adaptive_movement_speed"
 	],
 	"description": "Add a jump button and a reworked grappling hook. ",
 	"factorio_version": "1.1"

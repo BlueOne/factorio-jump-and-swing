@@ -9,7 +9,6 @@ Jump.jump_key_event = "jump"
 Jump.jump_cooldown = 0
 Jump.default_jump_speed = 0.4
 
-Jump.jumps_to_add = {}
 Jump.jumps_to_delete = {}
 
 
@@ -61,8 +60,8 @@ end
 function Jump.destroy(jump)
   if not jump.valid then return end
   jump.valid = false
-  table.insert(Jump.jumps_to_delete, jump.unit_number)
-  FloatingMovement.unset_source_flag(jump.unit_number, "jump", true)
+  global.jumps[jump.unit_number] = nil
+  FloatingMovement.unset_floating_flag(jump.unit_number, "jump", true)
 end
 
 function Jump.on_tick()
@@ -75,14 +74,6 @@ function Jump.on_tick()
     end
   end
 
-  for unit_number, jump in pairs(Jump.jumps_to_add) do
-    global.jumps[unit_number] = jump
-  end
-  Jump.jumps_to_add = {}
-  for _, unit_number in pairs(Jump.jumps_to_delete) do
-    global.jumps[unit_number] = nil
-  end
-  Jump.jumps_to_delete = {}
 end
 Event.register(defines.events.on_tick, Jump.on_tick)
 
@@ -92,7 +83,7 @@ function Jump.start_jump(character, skip_check)
   if not skip_check and not Jump.can_jump(character) then return false end
 
   local player = character.player
-  local new_character = FloatingMovement.set_source_flag(character, "jump")
+  local new_character = FloatingMovement.set_floating_flag(character, "jump")
   if new_character then
     character = new_character
   else
@@ -109,9 +100,10 @@ function Jump.start_jump(character, skip_check)
 
   FloatingMovement.set_properties_character(character, "jump", "g", { drag = 0.01 })
   local floater = FloatingMovement.from_character(character)
-  floater.vel_z = floater.vel_z + Jump.default_jump_speed
+  floater.vel_z = Jump.default_jump_speed
 
-  Jump.jumps_to_add[jump.unit_number] = jump
+  global.jumps[jump.unit_number] = jump
+
   return jump
 end
 

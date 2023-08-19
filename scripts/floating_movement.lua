@@ -2,25 +2,26 @@
 
 -- Floating Movement
 -- -----------------
--- Allow players to move in a flying/floating way. Handle animation, rendering, basic physics, basic air thrust
+-- Allow players to move in a flying/floating way. Handle graphics of floating state and landing animation, basic physics via xy and z velocity, basic air thrust via player input, velocity preservation upon landing
 
--- A character might be floating due to different reasons such as jumping or grappling. This is managed here.
--- Set a character floating via set_source_flag; if they are already floating then there is no need to change the state but we record the flag. Set a character not floating via unset_source_flag, if they are still floating due to another reason, they stay floating. 
-
+-- A character might be floating due to different reasons such as jumping or grappling. This is managed here:
+-- Set a character floating via set_floating_flag; if they are already floating then there is no need to change the state but we record the flag and potentially properties. Set a character not floating via unset_floating_flag, if they are still floating due to another reason, they stay floating. 
+-- The floating properties of a character might differ due to the reason they are floating, e.g. one might want different brake values when grappling or jumping. This is managed via the set_properties and get_property_value functions, see below. 
 
 
 FloatingMovement = {}
 
--- Character swapped event see utils.
---{character : LuaEntity, old_position : MapPosition, new_position : MapPosition}
 
+-- Custom Events
+-- Character swapped event: see utils.
+--`{character : LuaEntity, old_position : MapPosition, new_position : MapPosition}`
 
 -- Raised when altitude becomes zero. 
---{character : LuaEntity, position : MapPosition}
+--`{character : LuaEntity, position : MapPosition}`
 FloatingMovement.on_character_touch_ground = "on_character_touch_ground"
 
 -- Raised when a landing is attempted, but no suitable landing spot is found, for example in water or dense factory areas. 
---{new_unit_number : uint, old_unit_number : uint, new_character : luaEntity, old_character : luaEntity}
+--`{new_unit_number : uint, old_unit_number : uint, new_character : luaEntity, old_character : luaEntity}`
 FloatingMovement.on_player_soft_revived_event = "on_player_soft_revived"
 
 FloatingMovement.name_character_suffix = "-floating"
@@ -31,19 +32,6 @@ FloatingMovement.shadow_base_offset = {x = 1, y = 0.1}
 FloatingMovement.landing_collision_snap_radius = 3
 FloatingMovement.default_gravity = -0.02
 
-FloatingMovement.no_floating_tiles = {
-  ["out-of-map"] = "bounce",
-  ["interior-divider"] = "bounce",
-  ["se-spaceship-floor"] = "stop",
-}
-
-FloatingMovement.bounce_entities = {
-  "se-spaceship-wall",
-  "se-spaceship-rocket-engine",
-  "se-spaceship-ion-engine",
-  "se-spaceship-antimatter-engine",
-  "se-spaceship-clamp",
-}
 
 
 -- Brake is an absolute velocity, drag is a ratio
@@ -51,7 +39,7 @@ FloatingMovement.default_drag = 0 --0.01
 FloatingMovement.default_brake = 0.00
 
 FloatingMovement.default_player_thrust = 0.01
-FloatingMovement.default_thrust_max_speed = 0.3
+FloatingMovement.default_thrust_max_speed = 0.5
 
 FloatingMovement.default_collision_damage = 50
 FloatingMovement.default_collide_with_environment = true
@@ -73,7 +61,7 @@ local function character_is_flying_version(name)
 end
 
 -- can fail, returns character if valid, nil otherwise
-function FloatingMovement.set_source_flag(character, key)
+function FloatingMovement.set_floating_flag(character, key)
   local floater = FloatingMovement.from_character(character)
   if not floater then 
     character = FloatingMovement.set_floating(character, key)
@@ -81,7 +69,7 @@ function FloatingMovement.set_source_flag(character, key)
     floater = FloatingMovement.from_character(character)
     return character
   end
-  floater.source_flags[key] = true
+  floater.floating_flags[key] = true
   return character
 end
 
@@ -166,7 +154,8 @@ local function stop_floating(floater, attempt_landing, last_key)
   
   if character and character.valid and attempt_landing then
     local surface = character.surface
-    local non_colliding = surface.find_non_colliding_position(
+    local non_colliding = util.find_close_noncolliding_position(
+      surface,
       util.replace(character.name, FloatingMovement.name_character_suffix, ""),
       character.position, 
       FloatingMovement.landing_collision_snap_radius, -- radius
@@ -230,16 +219,16 @@ local function stop_floating(floater, attempt_landing, last_key)
 end
 
 -- if attempt_landing is set, try to find a non colliding position for the character if it stops floating from this
-function FloatingMovement.unset_source_flag(unit_number, key, attempt_landing)
+function FloatingMovement.unset_floating_flag(unit_number, key, attempt_landing)
   local floater = global.floaters[unit_number]
   if not floater or not floater.valid then return end
-  floater.source_flags[key] = false
+  floater.floating_flags[key] = false
   FloatingMovement.unset_properties(floater, key)
-  if util.all_wrong(floater.source_flags) then stop_floating(floater, attempt_landing, key) end
+  if util.all_wrong(floater.floating_flags) then stop_floating(floater, attempt_landing, key) end
 end
 
-function FloatingMovement.has_source_flag(character, source_flag)
-  return FloatingMovement.from_character(character).source_flags[source_flag]
+function FloatingMovement.has_floating_flag(character, floating_flag)
+  return FloatingMovement.from_character(character).floating_flags[floating_flag]
 end
 
 
@@ -279,17 +268,24 @@ function FloatingMovement.ground_position(character)
   return {x = pos.x, y = pos.y + altitude}
 end
 
-function FloatingMovement.add_altitude(character, delta)
+function FloatingMovement.add_altitude_character(character, delta)
   local floater = FloatingMovement.get_float_data(character)
   if not floater then return end
-  
+  FloatingMovement.add_altitude(floater, delta)
+end
+
+function FloatingMovement.add_altitude(floater, delta)
   local new_altitude = floater.altitude + delta
-  if new_altitude > 0 then
-    floater.character.teleport({x = floater.character.position.x, y = floater.character.position.y - delta})
+  local character = floater.character
+
+
+  if new_altitude > 0.001 then
+    floater.character.teleport(util.vectors_add(floater.character.position, {x=0, y=-delta}))
     floater.altitude = new_altitude
   else
-    floater.character.teleport({x = floater.character.position.x, y = floater.character.position.y + floater.altitude})
+    floater.character.teleport(util.vectors_add(floater.character.position, {x=0, y=floater.altitude}))
     floater.altitude = 0
+    -- TODO: Move to start of on_tick
     Event.raise_custom_event("on_character_touch_ground", {character=character, position=character.position, floater = floater})
     floater.vel_z = 0
   end
@@ -297,8 +293,6 @@ end
 
 
 function FloatingMovement.update_graphics(floater)
-  if floater.character_type == "land" then return end
-  
   local frame = floater.character.orientation * 100
   
   if (not floater.animation_shadow) or not rendering.is_valid(floater.animation_shadow) then
@@ -327,18 +321,16 @@ function FloatingMovement.get_float_data(character)
 end
 
 function FloatingMovement.set_floating(character, key)
-  local surface = character.surface
   local player = character.player
-  local force_name = character.force.name
   local safe_position = character.position
   
   if not player then return end
   if character.vehicle or global.disabled_on and global.disabled_on[character.unit_number] then return end
   local tile = character.surface.get_tile(character.position.x, character.position.y)
   
-  if FloatingMovement.no_floating_tiles[tile.name] then
-    return
-  end
+  -- if tile.name == "out-of-map" then
+  --   return
+  -- end
   
   
   local velocity
@@ -382,7 +374,7 @@ function FloatingMovement.set_floating(character, key)
     vel_z = 0,
     altitude = altitude,
     safe_position = safe_position,
-    source_flags = { [key] = true},
+    floating_flags = { [key] = true},
     properties = {},
     valid = true
   }
@@ -401,33 +393,6 @@ function FloatingMovement.set_floating(character, key)
   return character
 end
 
-
-local function movement_collision_bounce(floater)
-  local character = floater.character
-  local tiles = floater.character.surface.find_tiles_filtered{area = Util.position_to_area(floater.character.position, 1.49)}
-  local best_vector
-  local best_distance
-  for _, tile in pairs(tiles) do
-    if not FloatingMovement.no_floating_tiles[tile.name] then
-      local v = Util.vectors_delta(floater.character.position, Util.tile_to_position(tile.position))
-      local d = Util.vectors_delta_length(Util.tile_to_position(tile.position), floater.character.position)
-      if (not best_distance) or d < best_distance then
-        best_distance = d
-        best_vector = v
-      end
-    end
-  end
-  if best_vector then
-    floater.velocity = Util.vector_set_length(best_vector, 0.05)
-    local new_position = {x = character.position.x + floater.velocity.x*4, y = character.position.y + floater.velocity.y*4}
-    character.teleport(new_position)
-  else
-    local x_part = (floater.character.position.x % 1 + 1) % 1 - 0.5
-    local y_part = (floater.character.position.y % 1 + 1) % 1 - 0.5
-    floater.velocity = {x = x_part, y = y_part}
-    floater.velocity = Util.vector_set_length(floater.velocity, 0.05)
-  end
-end
 
 
 Event.register_custom_event(util.on_character_swapped_event, 
@@ -450,7 +415,7 @@ local function movement_tick(floater)
     global.floaters[floater.unit_number] = nil
     return
   end
-  
+
   local drag = FloatingMovement.get_property_value(floater, "drag")
   floater.velocity = util.vector_multiply(floater.velocity, 1-drag)
   
@@ -496,56 +461,53 @@ local function movement_tick(floater)
   local new_ground_position = {x=new_position.x, y = new_position.y + floater.altitude}
   
   local target_tile = character.surface.get_tile(new_ground_position.x, new_ground_position.y)
-  if target_tile then
-    local tile_effect = FloatingMovement.no_floating_tiles[target_tile.name]
-    -- bounce
-    if tile_effect == "bounce" then
-      movement_collision_bounce(floater)
-    elseif tile_effect == "stop" then
-      local bounce_entity = character.surface.find_entities_filtered({name = FloatingMovement.bounce_entities, position = util.tile_to_position(target_tile.position), limit = 1})
-      if #bounce_entity == 1 then
-        movement_collision_bounce(floater)
-      else
-        -- Instant stop
-        character.teleport(new_position)
-        stop_floating(character, false)
+  if target_tile and target_tile.name == "out-of-map" then
+    floater.velocity = util.movement_collision_bounce(floater.character) or floater.velocity
+  elseif target_tile and FloatingMovement.is_moving(floater) then
+    if not target_tile.collides_with("player-layer") and game.tick%60==0 then
+      local safe_position = character.surface.find_non_colliding_position(FloatingMovement.character_ground_name(character.name), character.position, 2, 0.2, true)
+      if safe_position then 
+        floater.safe_position = safe_position
       end
-    elseif FloatingMovement.is_moving(floater) then
-      if not target_tile.collides_with("player-layer") and game.tick%60==0 then
-        local safe_position = character.surface.find_non_colliding_position(FloatingMovement.character_ground_name(character.name), character.position, 2, 0.2, true)
-        if safe_position then 
-          floater.safe_position = safe_position
-        end
+    end
+    -- Actual Teleport
+    local safe_collide
+    if cliff_collision then
+      safe_collide = util.find_close_noncolliding_position(character.surface, character_name_swapped(character), new_position, 0.5, 0.2, false)
+      if safe_collide then 
+        character.teleport(safe_collide)
       end
-      -- Actual Teleport
-      local safe_collide
-      if cliff_collision then
-        safe_collide = util.find_close_noncolliding_position(character.surface, character_name_swapped(character), new_position, 0.5, 0.1, false)
-        if safe_collide then 
-          character.teleport(safe_collide)
-        end
-      end
-      if not safe_collide then 
-        character.teleport(new_position)
-      end
-      
-      -- environmental hazards
-      if floater.altitude < 0.2 and util.vector_length(floater.velocity) > 0.2 and collide_with_environment then
-        FloatingMovement.collision_with_destructibles(floater, new_position)
-      end
+    end
+    if not safe_collide then 
+      character.teleport(new_position)
+    end
+    
+    -- environmental hazards
+    if floater.altitude < 0.2 and util.vector_length(floater.velocity) > 0.2 and collide_with_environment then
+      FloatingMovement.collision_with_destructibles(floater, new_position)
     end
   else
     floater.velocity = util.vector_multiply(floater.velocity, 1/2)
   end
-  
+
+  -- z coordinate
   if character and character.valid then
     if floater.altitude > 0 or floater.vel_z > 0 then
       local gravity = FloatingMovement.get_property_value(floater, "gravity")
       floater.vel_z = floater.vel_z + gravity
-      FloatingMovement.add_altitude(floater.character, floater.vel_z)
+      local pid = floater.character.player.index
+      FloatingMovement.add_altitude(floater, floater.vel_z)
+      -- If the character gets grounded from this, it tries to walk in addition to the xy computation we just did, so we take the walking back here.
+      -- This is slightly dirty, but we also want the collision computation from earlier, when we jump on rocks etc.
+      if not floater.character.valid then
+        local character = game.players[pid].character
+        if character then
+          character.teleport(util.vectors_add(character.position, util.vector_multiply(util.direction_to_vector(character.walking_state.direction), -character.character_running_speed)))
+        end
+      end
     end
-  end  
-  
+  end
+
   if character and character.valid then 
     FloatingMovement.update_graphics(floater)
   end
@@ -600,7 +562,7 @@ function FloatingMovement.walk_speed_decay(unit_number, decay_data)
 end
 
 
-function FloatingMovement.on_tick(event)
+function FloatingMovement.on_tick()
   for _, floater in pairs(global.floaters) do
     movement_tick(floater)
   end
@@ -629,9 +591,9 @@ end)
 
 util.expose_remote_interface(FloatingMovement, "jump-and-swing_floating_movement", {
   "is_floating",
-  "set_source_flag",
-  "unset_source_flag",
-  "get_source_flag",
+  "set_floating_flag",
+  "unset_floating_flag",
+  "get_floating_flag",
   "from_character",
   "is_moving",
   "ground_position",

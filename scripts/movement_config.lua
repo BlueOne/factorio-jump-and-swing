@@ -70,27 +70,28 @@ end
 
 function MovementConfig.grapple_range(character)
   local level = level(character)
-  local values = {[-1]=12, [0]=12, [1]=12, [2]=25, [3]=40}
+  local values = {[-1]=16, [0]=16, [1]=16, [2]=25, [3]=40}
   return values[level]
 end
 
 function MovementConfig.grapple_cooldown(character)
   --local values = {[-1]=80, [0]=80, [1]=40, [2]=25, [3]=25}
-  local values = {[-1]=80, [0]=80, [1]=40, [2]=40, [3]=40}
+  local values = {[-1]=40, [0]=40, [1]=40, [2]=40, [3]=40}
   return values[level(character)]
 end
 
 function MovementConfig.grapple_duration(character)
-  local level = level(character)
-  local values = {[-1]=30, [0]=30, [1]=40, [2]=40, [3]=50}
-  local multiplier = 3
-  if not MovementConfig.autojump(character) then multiplier = 3 end
-  return values[level] * multiplier
+  -- local level = level(character)
+  -- local values = {[-1]=30, [0]=30, [1]=40, [2]=40, [3]=50}
+  -- local multiplier = 3
+  -- if not MovementConfig.autojump(character) then multiplier = 3 end
+--  return values[level] * multiplier
+  return 10000
 end
 
 function MovementConfig.grapple_pull_acceleration_threshold(character)
   local level = level(character)
-  local values = {[-1]=0.4, [0]=0.4, [1]=0.5, [2]=1, [3]=2}
+  local values = {[-1]=0.6, [0]=0.6, [1]=0.6, [2]=1, [3]=2}
   return values[level]
 end
 
@@ -103,6 +104,12 @@ end
 function MovementConfig.grapple_pull_acceleration(character)
   local level = level(character)
   local values = {[-1]=0.02, [0]=0.02, [1]=0.02, [2]=0.028, [3]=0.04}
+  return values[level]
+end
+
+function MovementConfig.grapple_throw_speed(character)
+  local level = level(character)
+  local values = {[-1]=1, [0]=1, [1]=1, [2]=2, [3]=3}
   return values[level]
 end
 

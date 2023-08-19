@@ -1,4 +1,4 @@
-local util = require("earendel-utils")
+local util = require("earendel-utils/earendel-utils")
 
 
 
@@ -89,8 +89,8 @@ end
 
 
 function util.find_close_noncolliding_position(surface, name, position, max_radius, precision, tile_center)
-  local radius = max_radius / 81
-  local pr = precision / 81
+  local radius = max_radius / 27
+  local pr = precision / 27
   for i=1,4 do
     local p = surface.find_non_colliding_position(name, position, radius, pr, tile_center)
     if p then return p end

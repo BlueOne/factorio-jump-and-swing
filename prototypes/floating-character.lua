@@ -40,7 +40,8 @@ end
 for _, name in pairs(char_list) do
   local copy = table.deepcopy(data.raw.character[name])
   copy.name = copy.name .."-floating"
-  copy.running_speed = 0.00001
+  --copy.running_speed = 0.00001
+  copy.running_speed = 0.05
   copy.collision_mask = {"not-colliding-with-itself"}
   remove_shadows_recursive(copy)
   set_render_layer_recursive(copy.animations, "air-object")
