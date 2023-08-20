@@ -135,7 +135,7 @@ end
 util.on_character_swapped_event = "on_character_swapped"
 
 
--- TODO: Put this back the way it was.
+-- I've modified this slightly from the original version. In particular, bots are no longer kept in a global variable to respawn later, as I wasn't sure if that does anything.
 -- Does not check if the target location is safe to spawn the new character, if collision masks change. 
 function util.swap_character(old, new_name)
   if not game.entity_prototypes[new_name] then error("No entity of type "..new_name.." found! "); return end
@@ -302,10 +302,14 @@ end
 
 
 function util.restore_crafting_queue(character, saved_queue, queue_progress)
-  if saved_queue then 
-    for _, items in pairs(saved_queue) do
+  if saved_queue then
+    local i = #saved_queue
+    while i > 0 do
+      local items = saved_queue[i]
       items.silent = true
       character.begin_crafting(items)
+      saved_queue[i] = nil
+      i = i - 1
     end
     character.crafting_queue_progress = math.min(1, queue_progress)
   end
@@ -466,7 +470,7 @@ function util.animate_landing(character, landing_tile, particle_mult, speed_mult
 end
 
 
--- Unrelated to Factorio API
+-- Table
 ------------------------------------------------------------
 
 
@@ -506,6 +510,10 @@ function util.random_from_array (tbl)
 --return tbl[1 + math.floor(#tbl * (math.random() - 0.0000001))]
 return tbl[math.random(#tbl)]
 end
+
+
+-- Geometry
+------------------------------------------------------------
 
 function util.area_add_position(area, position)
 local area2 = table.deepcopy(area)
@@ -762,6 +770,25 @@ function util.orientation_to_direction(orientation)
   end
 end
 
+function util.direction_to_vector(direction)
+  return util.vector_normalise(util.direction_to_vector_unnormalised(direction))
+  end
+  
+  function util.direction_to_vector_unnormalised (direction)
+  if direction == defines.direction.east then return {x=1,y=0} end
+  if direction == defines.direction.north then return {x=0,y=-1} end
+  if direction == defines.direction.northeast then return {x=1,y=-1} end
+  if direction == defines.direction.northwest then return {x=-1,y=-1} end
+  if direction == defines.direction.south then return {x=0,y=1} end
+  if direction == defines.direction.southeast then return {x=1,y=1} end
+  if direction == defines.direction.southwest then return {x=-1,y=1} end
+  if direction == defines.direction.west then return {x=-1,y=0} end
+  end
+  
+
+-- Signals
+-----------------------------------------------------------
+
 function util.signal_to_string(signal)
   return signal.type .. "__" .. signal.name
 end
@@ -794,6 +821,10 @@ function util.signal_container_get(container, signal)
       return container[signal.type][signal.name]
   end
 end
+
+
+-- Strings
+------------------------------------------------------------
 
 util.char_to_multiplier = {
   m = 0.001,
@@ -912,21 +943,6 @@ end
 end
 
 
-function util.direction_to_vector(direction)
-return util.vector_normalise(util.direction_to_vector_unnormalised(direction))
-end
-
-function util.direction_to_vector_unnormalised (direction)
-if direction == defines.direction.east then return {x=1,y=0} end
-if direction == defines.direction.north then return {x=0,y=-1} end
-if direction == defines.direction.northeast then return {x=1,y=-1} end
-if direction == defines.direction.northwest then return {x=-1,y=-1} end
-if direction == defines.direction.south then return {x=0,y=1} end
-if direction == defines.direction.southeast then return {x=1,y=1} end
-if direction == defines.direction.southwest then return {x=-1,y=1} end
-if direction == defines.direction.west then return {x=-1,y=0} end
-end
-
 function util.sign(x)
  if x<0 then
    return -1
@@ -936,6 +952,12 @@ function util.sign(x)
    return 0
  end
 end
+
+
+
+-- Gui
+------------------------------------------------------------
+
 
 function util.find_first_descendant_by_name(gui_element, name)
 for _, child in pairs(gui_element.children) do

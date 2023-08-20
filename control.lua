@@ -13,7 +13,3 @@ Grapple = require("scripts/grapple")
 
 Migrations = require('scripts/migrations')
 
-
--- Run this after on_tick of other mods so they can make changes first
-Event.register(defines.events.on_tick, FloatingMovement.on_tick)
-

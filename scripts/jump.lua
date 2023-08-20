@@ -1,10 +1,6 @@
 local Jump = {}
 
 
---TODO: 
--- Action of jump button while already jumping? - airjump, dash, slow-fall
-
-
 Jump.jump_key_event = "jump"
 Jump.jump_cooldown = 0
 Jump.default_jump_speed = 0.4
@@ -64,18 +60,17 @@ function Jump.destroy(jump)
   FloatingMovement.unset_floating_flag(jump.unit_number, "jump", true)
 end
 
-function Jump.on_tick()
+function Jump.pre_movement_tick()
   for _, jump in pairs(global.jumps) do
     if jump.valid then
-      if not (jump.character and jump.character.valid) then
+      if not (jump.character and jump.character.valid) or not FloatingMovement.is_floating(jump.character) then
         Jump.destroy(jump)
         return
       end
     end
   end
-
 end
-Event.register(defines.events.on_tick, Jump.on_tick)
+Event.register_custom_event("on_pre_movement_tick", Jump.pre_movement_tick)
 
 -- Creates a new jump object and sets character floating.
 -- Checks if jumping is allowed, if you want to force a jump then pass skip_check
@@ -133,18 +128,6 @@ end
 Event.register(Jump.jump_key_event, Jump.on_jump_keypress)
 
 
-
--- TODO: this should be in floating movement
-function Jump.on_player_driving_changed_state(event)
-  local player = game.get_player(event.player_index)
-  if not player or not player.character or not player.character.valid then return end
-  if Jump.is_jumping(player.character) then
-    Jump.instant_landing(Jump.from_character(player.character))
-  end
-end
-Event.register(defines.events.on_player_driving_changed_state, Jump.on_player_driving_changed_state)
-
-
 Event.register_custom_event(util.on_character_swapped_event, 
 ---@param event CharacterSwappedEvent
 function (event)
@@ -163,6 +146,15 @@ function Jump.on_init()
 end
 Event.register("on_init", Jump.on_init)
 
+function Jump.on_floating_movement_canceled(event)
+  local character = event.character
+  if not event.character or not event.character.valid then return end
+  local jump = Jump.from_character(character)
+  if jump and jump.valid then
+    Jump.destroy(jump)
+  end
+end
+Event.register_custom_event("on_floating_movement_canceled", Jump.on_floating_movement_canceled)
 
 util.expose_remote_interface(Jump, "jump-and-swing_jump", {
   "is_jumping",

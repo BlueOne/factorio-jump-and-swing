@@ -1,7 +1,6 @@
 
 
 
-
 local gun = data.raw.gun["grappling-gun"]
 gun.attack_parameters.cooldown = 5
 gun.attack_parameters.sound = nil

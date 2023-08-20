@@ -18,6 +18,7 @@ remote.add_interface(Mod_Prefix.."Event", {
 
 -- Not tested. Sorry. 
 -- Call only before on_init
+-- If not using stdlib, see https://github.com/Bilka2/AbandonedRuins/blob/b344cd3d598cedc7a77a484ab3f9efe4c63e229d/control.lua#L215
 function Event.register_custom_event_external(event_name, handler, filter, pattern, options)
   local function deferred_register()
     local event_id

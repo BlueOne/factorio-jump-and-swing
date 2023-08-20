@@ -148,24 +148,19 @@ function Grapple.on_init()
   global.grapple_to_destroy = {}
   global.grapple_id = 1
   global.grapple_button_hold = {}
-  if remote.interfaces.freeplay then 
-    remote.call("freeplay", "set_respawn_items", {  
-      ["grappling-gun"] = 1,
-      ["grappling-gun-ammo"] = 200,
-    }) 
-  end
-  if remote.interfaces.freeplay then 
-    remote.call("freeplay", "set_created_items", {  
-      ["grappling-gun"] = 1,
-      ["grappling-gun-ammo"] = 200,
-      ["iron-plate"] = 8,
-      ["wood"] = 1,
-      ["pistol"] = 1,
-      ["firearm-magazine"] = 10,
-      ["burner-mining-drill"] = 1,
-      ["stone-furnace"] = 1,
-    }) 
-  end
+  -- For testing. 
+  -- if remote.interfaces.freeplay then 
+  --   remote.call("freeplay", "set_respawn_items", {  
+  --     ["grappling-gun"] = 1,
+  --     ["grappling-gun-ammo"] = 200,
+  --   }) 
+  -- end
+  -- if remote.interfaces.freeplay then 
+  --   remote.call("freeplay", "set_created_items", {  
+  --     ["grappling-gun"] = 1,
+  --     ["grappling-gun-ammo"] = 200,
+  --   }) 
+  -- end
 end
 Event.register("on_init", Grapple.on_init)
 
@@ -316,7 +311,7 @@ function Grapple.check(grapple)
   return true
 end
 
-function Grapple.on_tick()
+function Grapple.pre_movement_tick()
   for _, player in pairs(game.connected_players) do
     global.grapple_button_hold[player.index] = global.grapple_button_hold[player.index] and player.character ~= nil and player.character.shooting_state.state ~= defines.shooting.not_shooting
   end
@@ -332,7 +327,7 @@ function Grapple.on_tick()
   end
   global.grapple_to_destroy = {}
 end
-Event.register(defines.events.on_tick, Grapple.on_tick)
+Event.register_custom_event("on_pre_movement_tick", Grapple.pre_movement_tick)
 
 
 Event.register_custom_event(util.on_character_swapped_event, 
@@ -395,6 +390,18 @@ function Grapple.on_player_soft_revived(event)
   end
 end
 Event.register_custom_event(FloatingMovement.on_player_soft_revived_event, Grapple.on_player_soft_revived)
+
+function Grapple.on_floating_movement_canceled(event)
+  local character = event.character
+  if not event.character or not event.character.valid then return end
+  local grapples = Grapple.get_grapples(character)
+  for _, grapple in pairs(grapples) do
+    if grapple and grapple.valid and not grapple.throw then
+      Grapple.destroy(grapple)
+    end
+  end
+end
+Event.register_custom_event("on_floating_movement_canceled", Grapple.on_floating_movement_canceled)
 
 util.expose_remote_interface(Grapple, "jump-and-swing_grapple", {
   "start_throw",

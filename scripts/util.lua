@@ -1,4 +1,4 @@
-local util = require("earendel-utils/earendel-utils")
+local util = require("earendel-scripts/earendel-utils")
 
 
 

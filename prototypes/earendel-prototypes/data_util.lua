@@ -1,7 +1,7 @@
 
 -- License: Earendel FMLDOL 
 -- https://docs.google.com/document/d/1z-6hZQekEHOu1Pk4z-V5LuwlHnveFLJGTjVAtjYHwMU
--- Copied by unique2 with permission from earendel
+-- Copied and modified by unique2 with permission from earendel
 
 
 local data_util = {}

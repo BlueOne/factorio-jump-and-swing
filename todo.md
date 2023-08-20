@@ -7,9 +7,8 @@ Post Release Todos
 
 Gameplay/Animation Details
 
-* Play slow walk animation when grappling
-* Water animation
-* Water hook projectile animation
+* Water wave/ripple animation
+* Water hook projectile graphic
 * Rework cliffs
 * Landing Bug
 * Add Coyote time for pressing jump just before landing
@@ -19,7 +18,7 @@ Gameplay/Animation Details
 
 Design
 
-* Promote swinging more.
 * collision with biter bases?
 * Tips and Tricks UI page
 * Idea: no friction only when pressing direction
+* Jump Button while already in the air - dash, damaging attack, ...

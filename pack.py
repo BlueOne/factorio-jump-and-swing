@@ -8,7 +8,7 @@ import zipfile
 
 
 ignored_file_endings = [".py", ".svg"]
-ignored_files = ["mod-portal-description.md", "todo.md"]
+ignored_files = ["todo.md"]
 
 mod_dir = os.path.dirname(os.path.abspath(__file__))
 os.chdir(mod_dir)

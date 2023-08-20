@@ -232,15 +232,6 @@ function FloatingMovement.has_floating_flag(character, floating_flag)
 end
 
 
-function FloatingMovement.tile_is_space(tile)
-  return FloatingMovement.space_tiles[tile.name] and true or false
-end
-
-function FloatingMovement.on_space_tile(character)
-  local tile = character.surface.get_tile(character.position.x, character.position.y)
-  return FloatingMovement.tile_is_space(tile)
-end
-
 function FloatingMovement.from_character(character)
   if not character then return end
   local unit_number
@@ -481,6 +472,14 @@ local function movement_tick(floater)
     if not safe_collide then 
       character.teleport(new_position)
     end
+
+    if string.find(target_tile.name, "water") and game.tick % 10 == 0 and floater.altitude < 0.4 then
+      for i = 1, 6 do
+        local angle = i / 6 + math.random()/10
+        local angle_vec = util.orientation_to_vector(angle, 0.05)
+        character.surface.create_particle{name="shallow-water-particle", position=character.position, movement=angle_vec, height=0, vertical_speed=0.1, frame_speed=0.5} 
+      end
+    end
     
     -- environmental hazards
     if floater.altitude < 0.2 and util.vector_length(floater.velocity) > 0.2 and collide_with_environment then
@@ -495,16 +494,7 @@ local function movement_tick(floater)
     if floater.altitude > 0 or floater.vel_z > 0 then
       local gravity = FloatingMovement.get_property_value(floater, "gravity")
       floater.vel_z = floater.vel_z + gravity
-      local pid = floater.character.player.index
       FloatingMovement.add_altitude(floater, floater.vel_z)
-      -- If the character gets grounded from this, it tries to walk in addition to the xy computation we just did, so we take the walking back here.
-      -- This is slightly dirty, but we also want the collision computation from earlier, when we jump on rocks etc.
-      if not floater.character.valid then
-        local character = game.players[pid].character
-        if character then
-          character.teleport(util.vectors_add(character.position, util.vector_multiply(util.direction_to_vector(character.walking_state.direction), -character.character_running_speed)))
-        end
-      end
     end
   end
 
@@ -562,7 +552,9 @@ function FloatingMovement.walk_speed_decay(unit_number, decay_data)
 end
 
 
-function FloatingMovement.on_tick()
+function FloatingMovement.on_tick(event)
+  Event.raise_custom_event("on_pre_movement_tick", event)
+
   for _, floater in pairs(global.floaters) do
     movement_tick(floater)
   end
@@ -572,7 +564,8 @@ function FloatingMovement.on_tick()
     FloatingMovement.walk_speed_decay(unit_number, decay_data)
   end
 end
--- Not registered here, should be run after on_tick of all modules that want to influence movement. 
+Event.register(defines.events.on_tick, FloatingMovement.on_tick)
+
 
 function FloatingMovement.on_init()
   global.floaters = {}
@@ -588,6 +581,20 @@ Event.register(defines.events.on_pre_player_died, function(event)
     global.bunnyhop_stored_data[character.unit_number] = nil
   end
 end)
+
+-- This can only happen via script
+function FloatingMovement.on_player_driving_changed_state(event)
+  local player = game.get_player(event.player_index)
+  if not player or not player.character or not player.character.valid then return end
+  local character = player.character
+  if FloatingMovement.is_floating(character) then
+    local floater = FloatingMovement.get_float_data(character)
+    Event.raise_custom_event("on_floating_movement_canceled", {character=character})
+    stop_floating(floater)
+  end
+end
+Event.register(defines.events.on_player_driving_changed_state, FloatingMovement.on_player_driving_changed_state)
+
 
 util.expose_remote_interface(FloatingMovement, "jump-and-swing_floating_movement", {
   "is_floating",

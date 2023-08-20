@@ -1,7 +1,7 @@
 
 -- License: Earendel FMLDOL 
 -- https://docs.google.com/document/d/1z-6hZQekEHOu1Pk4z-V5LuwlHnveFLJGTjVAtjYHwMU
--- Modified by unique2 with permission from earendel
+-- Taken from the jetpack mod, modified by unique2 with permission from earendel
 
 
 local data_util = require("data_util")
@@ -41,18 +41,17 @@ for _, name in pairs(char_list) do
   local copy = table.deepcopy(data.raw.character[name])
   copy.name = copy.name .."-floating"
   --copy.running_speed = 0.00001
-  copy.running_speed = 0.05
+  copy.running_speed = 0.03
   copy.collision_mask = {"not-colliding-with-itself"}
   remove_shadows_recursive(copy)
   set_render_layer_recursive(copy.animations, "air-object")
   copy.render_layer = "air-object"
+  copy.footstep_particle_triggers = nil
   copy.enter_vehicle_distance = 0
   copy.localised_name = {"entity-name.character-floating", {"entity-name."..name}}
   copy.flags = copy.flags or {}
   copy.has_belt_immunity = true
-  if copy.water_reflection then
-    copy.water_reflection = nil
-  end
+  copy.water_reflection = nil
   if not data_util.table_contains(copy.flags, "hidden") then
     table.insert(copy.flags, "hidden")
   end
