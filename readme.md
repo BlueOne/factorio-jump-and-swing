@@ -13,7 +13,7 @@ To jump, you need to unlock a technology and set up a hotkey, per default, the j
 Early Version
 -------------
 
-The mod is in an early stage. I am not aware of any crashes but use autosaves. Cliffs are more than slightly buggy at the moment. It is incompatible with some mods, see below. Some game mechanics might still change and performance is fine, but not perfectly optimized. Do not uninstall this mod while players are still in a floating state (jumping or hooking).
+The mod is in an early stage. I am not aware of any crashes but use autosaves. It is incompatible with some mods, see below. Some game mechanics might still change. Performance is fine, but not perfectly optimized. Do not uninstall this mod while players are still in a floating state (jumping or hooking).
 
 Compatibility
 -------------
