@@ -1,17 +1,19 @@
 Jump and Swing
 ==============
 
-This mod replaces the movement mechanics of Earendel's grappling hook and adds a jump button. Unlike with the original grappling gun mod, with this one you can preserve your momentum and actually swing around. Preserving your momentum becomes a small challenge to keep movement interesting as you move around the world.
+This mod replaces the movement mechanics of Earendel's grappling gun mod and adds a jump button. Unlike with the original grappling gun mod, with this one you can preserve your momentum and swing around. Preserving your momentum becomes a small challenge to keep movement interesting as you explore the world.
+
+[Demo Video](https://www.youtube.com/watch?v=ktT1L1qayZU)
 
 How to use
 ----------
 
-You need a technology to jump, then another for the grappling gun. Per default, the jump hotkeys are J and Mouse Button 4. Hold the shooting button of the grappling gun for as long as the hook should stay active. When you release the hook, you will jump automatically. Experiment with the keybindings, I suggest using one of the mouse buttons and the space bar for the jump button and the shooting button, so you can reach both while holding the direction keys (WASD).
+To jump, you need to unlock a technology and set up a hotkey, per default, the jump hotkeys are J and Mouse Button 4. To use the grappling gun, you need to unlock another technology to get the weapon and ammunition. Hold the shooting button of the grappling gun for as long as the hook should stay active. When you release the hook, you will jump automatically. The higher technology levels upgrade the grappling gun automatically. Experiment with the keybindings, I suggest using one of the mouse buttons and the space bar for the jump button and the shooting button, so you can reach both while holding the direction keys (WASD).
 
 Early Version
 -------------
 
-The mod is in an early stage. I am not aware of any crashes but use autosaves. Cliffs are more than slightly buggy at the moment. It is incompatible with some mods, see below. Some game mechanics might still change. Do not uninstall this mod while players are still in a floating state (jumping or hooking).
+The mod is in an early stage. I am not aware of any crashes but use autosaves. Cliffs are more than slightly buggy at the moment. It is incompatible with some mods, see below. Some game mechanics might still change and performance is fine, but not perfectly optimized. Do not uninstall this mod while players are still in a floating state (jumping or hooking).
 
 Compatibility
 -------------
@@ -38,7 +40,7 @@ Maybe compatible:
 Acknowledgements
 ----------------
 
-This mod relies on graphics of the grappling gun mod and contains modified parts of the source code of the jetpack mod by Earendel.
+This mod relies on graphics of the grappling gun mod and contains modified parts of the source code of the jetpack and grappling gun mod, with permission from Earendel.
 
 Other Movement Mods
 -------------------

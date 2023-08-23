@@ -105,6 +105,18 @@ function util.do_rects_intersect(r1, r2)
   return util.doPolygonsIntersect(p1, p2)
 end
 
+function util.scale_rect(rect, factor)
+  local center = util.vectors_add(rect.left_top, rect.right_bottom)
+  center = util.vector_multiply(center, 0.5)
+  local result_rect = { orientation = rect.orientation }
+  for _, k in pairs{"left_top", "right_bottom"} do
+    local relative = util.vector_diff(rect[k], center)
+    local scaled = util.vector_multiply(relative, factor)
+    result_rect[k] = util.vectors_add(scaled, center)
+  end
+  return result_rect
+end
+
 -- layered properties
 -----------------------------------------------------------
 -- This is a data structure which may save values for the same property in different ordered layers, and a lookup returns the value of the property in the first layer that sets it. 

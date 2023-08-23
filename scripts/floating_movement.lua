@@ -434,17 +434,24 @@ local function movement_tick(floater)
   
   local cliff_collision
   local collide_with_environment = FloatingMovement.get_property_value(floater, "collide_with_environment")
+  local impact = 0
   if floater.altitude < 0.2 and collide_with_environment then
     local surface = character.surface
     local cliffs = surface.find_entities_filtered{position=character.position, radius=5, type="cliff"}
     for _, e in pairs(cliffs) do
-      cliff_collision = true
-      local intersection = util.do_rects_intersect(character.bounding_box, e.bounding_box)
+      local intersection = util.do_rects_intersect(character.bounding_box, util.scale_rect(e.bounding_box, 1.1))
       if intersection then
+        cliff_collision = true
         local normal = util.box_normal(e.bounding_box, character.position)
-        floater.velocity = util.vector_diff(floater.velocity, util.vector_multiply(normal, util.vector_dot(normal, floater.velocity)))
+        local delta_v = util.vector_multiply(normal, util.vector_dot(normal, floater.velocity))
+        floater.velocity = util.vector_diff(floater.velocity, delta_v)
+        impact = impact + util.vector_length(delta_v)
       end
     end
+  end
+  if impact > 0.4 then 
+    character.damage(impact * 5, "neutral", "physical", character)
+    if not character.valid then return end
   end
   
   

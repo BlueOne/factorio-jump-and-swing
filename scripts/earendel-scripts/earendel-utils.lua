@@ -1,7 +1,7 @@
 
 -- License: Earendel FMLDOL 
 -- https://docs.google.com/document/d/1z-6hZQekEHOu1Pk4z-V5LuwlHnveFLJGTjVAtjYHwMU
--- Copied and modified from jetpack mod, with permission from Earendel
+-- Copied from the jetpack and grappling gun mod and modified by unique2 with permission from earendel
 
 local util = require("__core__/lualib/util.lua")
 

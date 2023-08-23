@@ -7,8 +7,7 @@ import os
 import zipfile
 
 
-ignored_file_endings = [".py", ".svg"]
-ignored_files = ["todo.md"]
+ignored_file_endings = [".py", ".svg", "todo.md"]
 
 mod_dir = os.path.dirname(os.path.abspath(__file__))
 os.chdir(mod_dir)
@@ -28,6 +27,12 @@ with zipfile.ZipFile(os.path.join('..', mod_file_name + '.zip'), 'w', zipfile.ZI
         for file in files:
             path = os.path.join(mod_file_name, root[2:], file)
             ends_with_any = lambda suffixes: any(file.endswith(ending) for ending in suffixes)
-            if file.startswith('.') or ends_with_any(ignored_file_endings) or ends_with_any(ignored_files):
+            starts_with_any = lambda prefixes: any(file.startswith(prefix) for prefix in prefixes)
+            if file.startswith("."): 
                 continue
+            if ends_with_any(ignored_file_endings):
+                continue
+            if root.endswith("gallery"):
+                continue
+            print(file)
             zipf.write(os.path.join(root, file), path)

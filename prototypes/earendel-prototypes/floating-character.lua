@@ -1,7 +1,7 @@
 
 -- License: Earendel FMLDOL 
 -- https://docs.google.com/document/d/1z-6hZQekEHOu1Pk4z-V5LuwlHnveFLJGTjVAtjYHwMU
--- Taken from the jetpack mod, modified by unique2 with permission from earendel
+-- Copied from the jetpack and grappling gun mod and modified by unique2 with permission from earendel
 
 
 local data_util = require("data_util")

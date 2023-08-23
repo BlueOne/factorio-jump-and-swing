@@ -23,7 +23,7 @@ local function draw_line(grapple)
   local to = grapple.projectile
   grapple.line1 = rendering.draw_line{
     color = lighten_color(grapple.character.player.color),--{r=50,g=50,b=50,a=1},
-    width = 2,
+    width = 5,
     gap_length = 0.1,
     dash_length = 0.1,
     from = from,
@@ -34,7 +34,7 @@ local function draw_line(grapple)
   }
   grapple.line2 = rendering.draw_line{
     color = {r=0,g=0,b=0,a=1},
-    width = 1,
+    width = 3,
     from = from,
     from_offset = {x=0, y=-1},
     to = to,
