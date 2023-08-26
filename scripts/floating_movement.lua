@@ -569,7 +569,6 @@ end
 
 
 function FloatingMovement.on_tick(event)
-  --if not next(global.floaters) then return end
   Event.raise_custom_event("on_pre_movement_tick", event)
 
   for _, floater in pairs(global.floaters) do

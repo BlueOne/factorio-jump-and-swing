@@ -13,14 +13,13 @@ To jump, you need to unlock a technology and set up a hotkey, per default, the j
 Early Version
 -------------
 
-The mod is in an early stage. I am not aware of any crashes but use autosaves. It is incompatible with some mods, see below. Some game mechanics might still change. Performance is fine, but not perfectly optimized. Do not uninstall this mod while players are still in a floating state (jumping or hooking).
+The mod is in an early stage. Use autosaves. It is incompatible with some mods, see below. Some game mechanics might still change. Performance is fine, but not perfectly optimized. Do not uninstall this mod while players are still in a floating state i.e. jumping or hooking.
 
 Compatibility
 -------------
 
 * Mods that enable fancy character movement are not supported at the moment.
-* Mods that switch the character model in runtime are not supported. To clarify, a single mod that changes the character model is probably fine, but if you can choose the character then you will have problems.
-* Mods that teleport on the same surface will be supported in the future, I suspect they mostly work, except you can get very long hooks.
+* Mods that switch the character in runtime are not supported. A mod that swaps the character model before you start playing is probably fine, but if the character gets replaced while the game is running, then you will have problems.
 * Mods that teleport to different surfaces like factorissimo 2 should be fine.
 * Mods that affect movement speed of individual players are incompatible and won't be made compatible. Mods that affect the movement speed of whole forces are fine, for example qol research; mods that affect player movement through equipment or capsules are also fine.
 
@@ -33,9 +32,6 @@ Known incompatible:
 * Caffeine
 * RPG mods
 
-Maybe compatible:
-
-* Portal or Teleporters
 
 Acknowledgements
 ----------------

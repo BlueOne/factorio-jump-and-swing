@@ -8,4 +8,13 @@ Date: 22.08.2023
 Version: 0.1.1
 Date: 23.08.2023
   Info:
-    - Fix cliffs, add player damage when colliding with cliffs.
+    - Fix cliffs
+    - Add player damage when colliding with cliffs.
+
+---------------------------------------------------------------------------------------------------
+Version: 0.1.2
+Date: 27.08.2023
+  Info:
+    - Fix that the hook was unlocked by the jump tech. 
+    - Stop hook when teleporting
+
