@@ -294,6 +294,18 @@ function Grapple.pulling_tick(grapple)
   end
 
 function Grapple.movement_tick(grapple)
+  -- Check that the player hasn't teleported.
+  -- This could be done via events, but some mods don't throw events, some throw different events. Easier this way.
+  if game.tick % 10 == 0 then
+    local position = grapple.character.position
+    local last_position = grapple.tp_check_position
+    if last_position and util.vector_distance_squared(position, last_position) > 20*20 then
+      Grapple.destroy(grapple)
+      return
+    end
+    grapple.tp_check_position = position
+  end
+
   if grapple.throw then
     Grapple.throwing_tick(grapple)
   else

@@ -7,12 +7,13 @@ Post Release Todos
 
 Gameplay/Animation Details
 
-* Water wave/ripple animation
+* Video on mod portal page
+* Make early grapple feel slightly better
 * Water hook projectile graphic
 * Landing Bug
 * Add Coyote time for pressing jump just before landing
-* Handle script_raised_teleport
 * Landing in water bug
+* Handle script_raised_teleport
 
 Design
 

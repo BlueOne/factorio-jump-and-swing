@@ -96,6 +96,7 @@ jump_tech.name = "jump"
 jump_tech.icon = "__jump-and-swing__/graphics/jump-icon.png"
 jump_tech.icon_size = 256
 jump_tech.icon_mipmaps = 4
+jump_tech.effects = nil
 
 data:extend{
   jump_tech,

@@ -45,6 +45,8 @@ FloatingMovement.default_collision_damage = 50
 FloatingMovement.default_collide_with_environment = true
 
 
+FloatingMovement.collision_types = {"cliff", "tree", "simple-entity"}
+
 
 function FloatingMovement.is_floating(character)
   local floater = FloatingMovement.from_character(character)
@@ -434,18 +436,21 @@ local function movement_tick(floater)
   
   local cliff_collision
   local collide_with_environment = FloatingMovement.get_property_value(floater, "collide_with_environment")
+  local close_entities
   local impact = 0
   if floater.altitude < 0.2 and collide_with_environment then
     local surface = character.surface
-    local cliffs = surface.find_entities_filtered{position=character.position, radius=5, type="cliff"}
-    for _, e in pairs(cliffs) do
-      local intersection = util.do_rects_intersect(character.bounding_box, util.scale_rect(e.bounding_box, 1.1))
-      if intersection then
-        cliff_collision = true
-        local normal = util.box_normal(e.bounding_box, character.position)
-        local delta_v = util.vector_multiply(normal, util.vector_dot(normal, floater.velocity))
-        floater.velocity = util.vector_diff(floater.velocity, delta_v)
-        impact = impact + util.vector_length(delta_v)
+    close_entities = surface.find_entities_filtered{position=character.position, radius=5, type=FloatingMovement.collision_types}
+    for _, e in pairs(close_entities) do
+      if e.type == "cliff" then
+        local intersection = util.do_rects_intersect(character.bounding_box, util.scale_rect(e.bounding_box, 1.1))
+        if intersection then
+          cliff_collision = true
+          local normal = util.box_normal(e.bounding_box, character.position)
+          local delta_v = util.vector_multiply(normal, util.vector_dot(normal, floater.velocity))
+          floater.velocity = util.vector_diff(floater.velocity, delta_v)
+          impact = impact + util.vector_length(delta_v)
+        end
       end
     end
   end
@@ -480,17 +485,21 @@ local function movement_tick(floater)
       character.teleport(new_position)
     end
 
-    if string.find(target_tile.name, "water") and game.tick % 10 == 0 and floater.altitude < 0.4 then
-      for i = 1, 6 do
-        local angle = i / 6 + math.random()/10
-        local angle_vec = util.orientation_to_vector(angle, 0.05)
-        character.surface.create_particle{name="shallow-water-particle", position=character.position, movement=angle_vec, height=0, vertical_speed=0.1, frame_speed=0.5} 
-      end
+    if string.find(target_tile.name, "water") and game.tick % 3 == 0 and floater.altitude < 0.4 then
+      character.surface.create_entity{name="water-splash", position=character.position, force="neutral"}
+      -- for i = 1, 6 do
+      --   local angle = i / 6 + math.random()/10
+      --   local angle_vec = util.orientation_to_vector(angle, 0.05)
+      --   character.surface.create_particle{name="shallow-water-particle", position=character.position, movement=angle_vec, height=0, vertical_speed=0.1, frame_speed=0.5} 
+      -- end
     end
     
     -- environmental hazards
     if floater.altitude < 0.2 and util.vector_length(floater.velocity) > 0.2 and collide_with_environment then
-      FloatingMovement.collision_with_destructibles(floater, new_position)
+      if not close_entities then 
+        close_entities = surface.find_entities_filtered{position=character.position, radius=5, type=FloatingMovement.collision_types}
+      end
+      FloatingMovement.collision_with_destructibles(floater, new_position, close_entities)
     end
   else
     floater.velocity = util.vector_multiply(floater.velocity, 1/2)
@@ -510,21 +519,21 @@ local function movement_tick(floater)
   end
 end
 
-function FloatingMovement.collision_with_destructibles(floater, new_position)
+function FloatingMovement.collision_with_destructibles(floater, new_position, close_entities)
   local character = floater.character
   local surface = character.surface
-  local simple_entities = surface.find_entities_filtered{position=new_position, radius=2, type="simple-entity"}
   local impact = 0
-  for _, e in pairs(simple_entities) do
-    if string.find(e.name, "rock") then
+  for _, e in pairs(close_entities) do
+    if e.valid and e.type == "simple-entity" and string.find(e.name, "rock") and util.vector_distance_squared(character.position, e.position) < 4 then
       e.die()
       impact = impact + 5
     end
   end
-  local trees = surface.find_entities_filtered{position=new_position, radius=1, type="tree"}
-  for _, e in pairs(trees) do
-    e.die()
-    impact = impact + 1
+  for _, e in pairs(close_entities) do
+    if e.valid and e.type == "tree" and util.vector_distance_squared(character.position, e.position) < 1 then
+      e.die()
+      impact = impact + 1
+    end
   end
   
   if impact > 0 then
@@ -560,6 +569,7 @@ end
 
 
 function FloatingMovement.on_tick(event)
+  --if not next(global.floaters) then return end
   Event.raise_custom_event("on_pre_movement_tick", event)
 
   for _, floater in pairs(global.floaters) do

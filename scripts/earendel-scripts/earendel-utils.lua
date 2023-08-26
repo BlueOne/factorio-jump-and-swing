@@ -50,7 +50,7 @@ function util.movement_collision_bounce(character)
     local x_part = (character.position.x % 1 + 1) % 1 - 0.5
     local y_part = (character.position.y % 1 + 1) % 1 - 0.5
     local new_velocity = {x = x_part, y = y_part}
-    new_velocity = Util.set_vector_length(new_velocity, 0.05)
+    new_velocity = Util.vector_set_length(new_velocity, 0.05)
     return new_velocity
   end
 end
@@ -677,6 +677,16 @@ end
 
 function util.lerp_vectors(a, b, alpha)
   return {x = a.x + (b.x - a.x) * alpha, y = a.y + (b.y - a.y) * alpha}
+end
+
+function util.vector_distance_squared(a, b)
+  local x = a.x - b.x
+  local y = a.y - b.y
+  return x*x + y*y
+end
+
+function util.vector_distance(a, b)
+  return util.sqrt(util.vector_distance_squared(a,b))
 end
 
 function util.move_to(a, b, max_distance, eliptical)
