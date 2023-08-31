@@ -895,6 +895,14 @@ function util.table_to_string(table)
 return serpent.block( table, {comment = false, numformat = '%1.8g' } )
 end
 
+function util.table_size(t)
+  local n = 0
+  for _, _ in pairs(t) do
+    n = n + 1
+  end
+  return n
+end
+
 function util.values_to_string(table)
 local string = ""
 for _, value in pairs(table) do

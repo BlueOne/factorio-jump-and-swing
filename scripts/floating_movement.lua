@@ -285,8 +285,9 @@ function FloatingMovement.add_altitude(floater, delta)
     floater.character.teleport(util.vectors_add(floater.character.position, {x=0, y=floater.altitude}))
     floater.altitude = 0
     -- TODO: Move to start of on_tick
-    Event.raise_custom_event("on_character_touch_ground", {character=character, position=character.position, floater = floater})
+    local former_vel_z = floater.vel_z
     floater.vel_z = 0
+    Event.raise_custom_event("on_character_touch_ground", {character=character, position=character.position, floater = floater, vel_z = former_vel_z})
   end
 end
 
@@ -354,7 +355,7 @@ function FloatingMovement.set_floating(character, key)
     end
   end
   if not velocity then velocity = {x=0, y=0} end
-  
+
   if not character_is_flying_version(character.name) then
     local new_character = swap_character_air_ground(character)
     if new_character then 
@@ -365,7 +366,7 @@ function FloatingMovement.set_floating(character, key)
       end
     end
   end
-  
+
   local floater = {
     character = character,
     unit_number = character.unit_number,
@@ -375,9 +376,10 @@ function FloatingMovement.set_floating(character, key)
     safe_position = safe_position,
     floating_flags = { [key] = true},
     properties = {},
-    valid = true
+    valid = true,
+    active = true -- tracks if any floating_flag is set.
   }
-  
+
   FloatingMovement.set_properties(floater, "default", "z", {
     drag = FloatingMovement.default_drag,
     brake = FloatingMovement.default_brake,
@@ -387,7 +389,7 @@ function FloatingMovement.set_floating(character, key)
     collide_with_environment = MovementConfig.collide_with_environment(),
     gravity = FloatingMovement.default_gravity
   })
-  
+
   global.floaters[character.unit_number] = floater
   return character
 end
@@ -415,6 +417,8 @@ local function movement_tick(floater)
     global.floaters[floater.unit_number] = nil
     return
   end
+
+  if not floater.active then return end
 
   -- Thrust from pressing direction keys
   --------------------------------------------------------------------
@@ -646,7 +650,7 @@ function FloatingMovement.on_tick(event)
   Event.raise_custom_event("on_pre_movement_tick", event)
 
   for _, floater in pairs(global.floaters) do
-    if util.all_wrong(floater.floating_flags) then stop_floating(floater, floater.attempt_landing, floater.last_key) end
+    if not floater.active then stop_floating(floater, floater.attempt_landing, floater.last_key) end
     movement_tick(floater)
   end
   

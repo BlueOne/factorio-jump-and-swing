@@ -4,6 +4,7 @@ local Jump = {}
 Jump.jump_key_event = "jump"
 Jump.jump_cooldown = 0
 Jump.default_jump_speed = 0.4
+Jump.pre_landing_jump_window = 5
 
 Jump.jumps_to_delete = {}
 
@@ -30,9 +31,14 @@ end
 function Jump.instant_land_character(character)
   if Jump.is_jumping(character) then Jump.instant_landing(Jump.from_character(character)) end
 end
+
 Event.register_custom_event("on_character_touch_ground", function(event)
   if event.character and event.character.valid then
+    local character = event.character
     Jump.instant_land_character(event.character)
+    if character.player and game.tick - global.jump.last_jump_press[character.player.index] <= Jump.pre_landing_jump_window then
+      Jump.start_jump(character)
+    end
   end
 end)
 
@@ -118,11 +124,8 @@ function Jump.on_jump_keypress(event)
   if event.player_index and game.players[event.player_index] and game.players[event.player_index].connected then
     local player = game.players[event.player_index]
     local character = player.character
-    if Jump.can_jump(character) then
-      Jump.start_jump(character)
-    else
-      player.play_sound{path="utility/cannot_build"}
-    end
+    global.jump.last_jump_press[event.player_index] = event.tick
+    Jump.start_jump(character)
   end
 end
 Event.register(Jump.jump_key_event, Jump.on_jump_keypress)
@@ -143,6 +146,9 @@ end)
 
 function Jump.on_init()
   global.jumps = {}
+  global.jump = {
+    last_jump_press = {}
+  }
 end
 Event.register("on_init", Jump.on_init)
 
@@ -159,7 +165,7 @@ Event.register_custom_event("on_floating_movement_canceled", Jump.on_floating_mo
 util.expose_remote_interface(Jump, "jump-and-swing_jump", {
   "is_jumping",
   "start_jump",
-  "instant_landing",
+  "instant_land_character",
   "destroy",
   "from_character",
 })

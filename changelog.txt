@@ -25,3 +25,4 @@ Date: ----------
     - Add collision with walls. Walls don't get damaged on collision, same as cliffs
     - Make collision along straight stretches of walls or cliffs smoother. Add friction along collisions.
     - Attempt to fix a bug that caused a slight jerk upon landing
+    - Add leniency for pressing jump slightly before hitting the ground
