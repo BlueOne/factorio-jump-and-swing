@@ -65,13 +65,14 @@ end
 -- can fail, returns character if valid, nil otherwise
 function FloatingMovement.set_floating_flag(character, key)
   local floater = FloatingMovement.from_character(character)
-  if not floater then 
+  if not floater then
     character = FloatingMovement.set_floating(character, key)
     if not character then return end
     floater = FloatingMovement.from_character(character)
     return character
   end
   floater.floating_flags[key] = true
+  floater.active = true
   return character
 end
 
@@ -226,7 +227,12 @@ function FloatingMovement.unset_floating_flag(unit_number, key, attempt_landing)
   if not floater or not floater.valid then return end
   floater.floating_flags[key] = false
   FloatingMovement.unset_properties(floater, key)
-  if util.all_wrong(floater.floating_flags) then stop_floating(floater, attempt_landing, key) end
+  if util.all_wrong(floater.floating_flags) then 
+    --stop_floating(floater, attempt_landing, key)
+    floater.attempt_landing = attempt_landing
+    floater.last_key = key
+    floater.active = false
+  end
 end
 
 function FloatingMovement.has_floating_flag(character, floating_flag)
@@ -640,6 +646,7 @@ function FloatingMovement.on_tick(event)
   Event.raise_custom_event("on_pre_movement_tick", event)
 
   for _, floater in pairs(global.floaters) do
+    if util.all_wrong(floater.floating_flags) then stop_floating(floater, floater.attempt_landing, floater.last_key) end
     movement_tick(floater)
   end
   
