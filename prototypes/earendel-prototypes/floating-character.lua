@@ -87,7 +87,6 @@ data:extend({
     },
 
     draw_as_shadow = true,
-    scale = 0.5,
   }
 })
 

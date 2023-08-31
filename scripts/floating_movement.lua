@@ -45,8 +45,8 @@ FloatingMovement.default_collision_damage = 50
 FloatingMovement.default_collide_with_environment = true
 
 
-FloatingMovement.collision_types = {"cliff", "tree", "simple-entity"}
-
+FloatingMovement.collision_types = {"cliff", "tree", "simple-entity", "wall"}
+FloatingMovement.indestructible_collision_types = { cliff = true, wall = true }
 
 function FloatingMovement.is_floating(character)
   local floater = FloatingMovement.from_character(character)
@@ -296,7 +296,7 @@ function FloatingMovement.update_graphics(floater)
       target_offset = {x = FloatingMovement.shadow_base_offset.x + floater.altitude, y = FloatingMovement.shadow_base_offset.y + floater.altitude},
       animation_speed = 0,
       animation_offset = frame,
-      tint = {1., 1., 1., 0.5}
+      tint = {1., 1., 1., 0.8}
     }
   else
     rendering.set_target(floater.animation_shadow, floater.character,
@@ -401,7 +401,8 @@ end)
 
 
 local function movement_tick(floater)
-  -- game.print(serpent.line(util.vector_length(floater.velocity)))
+  -- Validation
+
   local character = floater.character
   -- Character died or was destroyed
   if not (character and character.valid) or not floater and floater.valid then
@@ -409,12 +410,16 @@ local function movement_tick(floater)
     return
   end
 
+  -- Thrust from pressing direction keys
+  --------------------------------------------------------------------
+
   local drag = FloatingMovement.get_property_value(floater, "drag")
   floater.velocity = util.vector_multiply(floater.velocity, 1-drag)
   
   if character.walking_state.walking and not FloatingMovement.get_property_value(floater, "disallow_thrust") then -- Player is pressing a direction
     local direction_vector = util.direction_to_vector(character.walking_state.direction or 0)
     -- local speed = util.vector_dot(floater.velocity, direction_vector)-- util.vector_length(floater.velocity)
+
     local speed_in_walking_direction = util.vector_dot(direction_vector, floater.velocity)
     local thrust_max_speed = FloatingMovement.get_property_value(floater, "thrust_max_speed")
     local speed_ratio = speed_in_walking_direction / thrust_max_speed
@@ -432,30 +437,84 @@ local function movement_tick(floater)
       floater.velocity = util.vector_multiply(floater.velocity, new_speed / speed)
     end
   end
-  
-  
-  local cliff_collision
+
+
+  -- Collision with indestructibles like cliffs and walls
+  --------------------------------------------------------------------
+
+  -- local new_position = util.vectors_add(character.position, floater.velocity)
+
+  local cliff_collision = false
   local collide_with_environment = FloatingMovement.get_property_value(floater, "collide_with_environment")
   local close_entities
   local impact = 0
   if floater.altitude < 0.2 and collide_with_environment then
     local surface = character.surface
-    close_entities = surface.find_entities_filtered{position=character.position, radius=5, type=FloatingMovement.collision_types}
-    for _, e in pairs(close_entities) do
-      if e.type == "cliff" then
-        local intersection = util.do_rects_intersect(character.bounding_box, util.scale_rect(e.bounding_box, 1.1))
-        if intersection then
-          cliff_collision = true
-          local normal = util.box_normal(e.bounding_box, character.position)
-          local delta_v = util.vector_multiply(normal, util.vector_dot(normal, floater.velocity))
-          floater.velocity = util.vector_diff(floater.velocity, delta_v)
-          impact = impact + util.vector_length(delta_v)
+    close_entities = surface.find_entities_filtered{position=character.position, radius=3, type=FloatingMovement.collision_types}
+
+    local function check_collision(box, entities)
+      local collisions = {}
+      for _, e in pairs(entities) do
+        if FloatingMovement.indestructible_collision_types[e.type] then
+          local entity_type = e.type
+          local scaling_factor = 1.1
+          if e.type == "wall" then
+            scaling_factor = 2
+          end
+          local rect = util.scale_rect(e.bounding_box, scaling_factor)
+            if util.do_rects_intersect(box, rect) then 
+            table.insert(collisions, { rect=rect, type=entity_type })
+          end
         end
+      end
+      return collisions
+    end
+    local collisions = check_collision(character.bounding_box, close_entities)
+    if next(collisions) then
+      cliff_collision = true
+
+      -- Compute collision normal as gradient vector of signed distance functions
+
+      local eps = 1e-4
+      local signed_distances = {100, 100, 100, 100}
+      for _, collision in pairs(collisions) do
+        local rect = collision.rect
+
+        local center = util.vector_multiply(util.vectors_add(rect.left_top, rect.right_bottom), 0.5)
+        local left_top = util.vectors_delta(rect.left_top, center)
+        local right_bottom = util.vectors_delta(rect.right_bottom, center)
+        
+        local position = util.vectors_delta(character.position, center)
+        
+        -- signed "distance" function for a rect given by left_top, right_bottom.
+        -- this intentionally isn't actually a distance function near the corners; the level sets are rects instead of rounded shapes. 
+        local function dist(p)
+          local x = math.max(p.x - left_top.x, right_bottom.x - p.x)
+          local y = math.max(p.y - left_top.y, right_bottom.y - p.y)
+          return math.max(x, y)
+        end
+      
+        for k, offset in pairs({ {x=eps,y=0}, {x=-eps,y=0}, {x=0,y=eps}, {x=0,y=-eps}}) do
+          local offset_position = util.vectors_add(offset, position)
+          if rect.orientation then
+            offset_position = util.rotate_vector(-rect.orientation, offset_position)
+          end
+          local d = dist(offset_position)
+          signed_distances[k] = math.min(signed_distances[k], d)
+        end
+      end
+      local normal = util.vector_normalise{ x = (signed_distances[1] - signed_distances[2]) / 2 / eps, y = (signed_distances[3] - signed_distances[4]) / 2 / eps}
+
+      -- Set velocity in normal direction to 0
+      if util.vector_dot(normal, floater.velocity) > 0 then
+        local delta_v = util.vector_multiply(normal, util.vector_dot(normal, floater.velocity))
+        floater.velocity = util.vector_multiply(util.vector_diff(floater.velocity, delta_v), 0.9)
+        impact = impact + util.vector_length(delta_v)
       end
     end
   end
   if impact > 0.4 then 
-    character.damage(impact * 5, "neutral", "physical", character)
+    character.damage(impact * 10, "neutral", "physical", character)
     if not character.valid then return end
   end
   
@@ -463,6 +522,10 @@ local function movement_tick(floater)
   local new_position = util.vectors_add(character.position, floater.velocity)
   local new_ground_position = {x=new_position.x, y = new_position.y + floater.altitude}
   
+
+  -- Change player position, check target tile
+  --------------------------------------------------------------------
+
   local target_tile = character.surface.get_tile(new_ground_position.x, new_ground_position.y)
   if target_tile and target_tile.name == "out-of-map" then
     floater.velocity = util.movement_collision_bounce(floater.character) or floater.velocity
@@ -473,7 +536,9 @@ local function movement_tick(floater)
         floater.safe_position = safe_position
       end
     end
+
     -- Actual Teleport
+
     local safe_collide
     if cliff_collision then
       safe_collide = util.find_close_noncolliding_position(character.surface, character_name_swapped(character), new_position, 0.5, 0.2, false)
@@ -485,6 +550,7 @@ local function movement_tick(floater)
       character.teleport(new_position)
     end
 
+    -- Water particle
     if string.find(target_tile.name, "water") and game.tick % 3 == 0 and floater.altitude < 0.4 then
       character.surface.create_entity{name="water-splash", position=character.position, force="neutral"}
       -- for i = 1, 6 do
@@ -497,7 +563,7 @@ local function movement_tick(floater)
     -- environmental hazards
     if floater.altitude < 0.2 and util.vector_length(floater.velocity) > 0.2 and collide_with_environment then
       if not close_entities then 
-        close_entities = surface.find_entities_filtered{position=character.position, radius=5, type=FloatingMovement.collision_types}
+        close_entities = surface.find_entities_filtered{position=character.position, radius=1.5, type=FloatingMovement.collision_types}
       end
       FloatingMovement.collision_with_destructibles(floater, new_position, close_entities)
     end
@@ -505,7 +571,9 @@ local function movement_tick(floater)
     floater.velocity = util.vector_multiply(floater.velocity, 1/2)
   end
 
-  -- z coordinate
+
+  -- Handle altitude
+  --------------------------------------------------------------------
   if character and character.valid then
     if floater.altitude > 0 or floater.vel_z > 0 then
       local gravity = FloatingMovement.get_property_value(floater, "gravity")
@@ -514,7 +582,7 @@ local function movement_tick(floater)
     end
   end
 
-  if character and character.valid then 
+  if character and character.valid then
     FloatingMovement.update_graphics(floater)
   end
 end

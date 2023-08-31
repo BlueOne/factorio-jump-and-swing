@@ -14,6 +14,7 @@ Gameplay/Animation Details
 * Add Coyote time for pressing jump just before landing
 * Landing in water bug
 * Handle script_raised_teleport
+* Github Repo
 
 Design
 

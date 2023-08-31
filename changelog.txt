@@ -18,3 +18,10 @@ Date: 27.08.2023
     - Fix that the hook was unlocked by the jump tech. 
     - Stop hook when teleporting
 
+---------------------------------------------------------------------------------------------------
+Version: 0.1.3
+Date: ----------
+  Info:
+    - Add collision with walls. Walls don't get damaged on collision, same as cliffs
+    - Make collision along straight stretches of walls or cliffs smoother. Add friction along collisions.
+
