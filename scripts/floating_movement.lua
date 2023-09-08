@@ -405,8 +405,6 @@ Event.register_custom_event(util.on_character_swapped_event,
 
 
 local function movement_tick(floater)
-  -- Validation
-
   local character = floater.character
   -- Character died or was destroyed
   if not (character and character.valid) or not floater and floater.valid then
@@ -437,7 +435,7 @@ local function movement_tick(floater)
     local speed = util.vector_length(floater.velocity)
     local brake = FloatingMovement.get_property_value(floater, "brake")
     local new_speed = speed - brake
-    if new_speed < 0.001 then
+    if speed < 0.001 or new_speed < 0.001 then
       floater.velocity = { x = 0, y = 0 }
     else
       floater.velocity = util.vector_multiply(floater.velocity, new_speed / speed)
@@ -570,10 +568,10 @@ local function movement_tick(floater)
       -- end
     end
 
-    -- environmental hazards
+    -- collision with destructibles e.g. trees, rocks
     if floater.altitude < 0.2 and util.vector_length(floater.velocity) > 0.2 and collide_with_environment then
       if not close_entities then
-        close_entities = surface.find_entities_filtered { position = character.position, radius = 1.5, type =
+        close_entities = character.surface.find_entities_filtered { position = character.position, radius = 1.5, type =
         FloatingMovement.collision_types }
       end
       FloatingMovement.collision_with_destructibles(floater, new_position, close_entities)

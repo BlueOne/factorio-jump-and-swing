@@ -20,9 +20,22 @@ function Jump.can_jump(character)
   end
 
   -- Cannot jump on water if floating
-  local position = FloatingMovement.ground_position(character) or character.position
-  local tile = character.surface.get_tile(position)
-  if not MovementConfig.can_jump_colliding(character) and tile.collides_with("player-layer") and FloatingMovement.is_floating(character) then
+  -- local position = FloatingMovement.ground_position(character) or character.position
+  local offsets = {}
+  for _, x in pairs({-1, 0, 1}) do
+    for _, y in pairs({-1, 0, 1}) do
+      table.insert(offsets, {x=x,y=y})
+    end
+  end
+  local on_water = true
+  for _, offset in pairs(offsets) do
+    local position = util.vectors_add(character.position, offset)
+    local tile = character.surface.get_tile(position)
+    if not tile.collides_with("player-layer") then
+      on_water = false
+    end
+  end
+  if not MovementConfig.can_jump_colliding(character) and on_water and FloatingMovement.is_floating(character) then
     return false
   end
   return true
@@ -36,7 +49,7 @@ Event.register_custom_event("on_character_touch_ground", function(event)
   if event.character and event.character.valid then
     local character = event.character
     Jump.instant_land_character(event.character)
-    if character.player and game.tick - global.jump.last_jump_press[character.player.index] <= Jump.pre_landing_jump_window then
+    if character.player and global.jump.last_jump_press[character.player.index] and  game.tick - global.jump.last_jump_press[character.player.index] <= Jump.pre_landing_jump_window then
       Jump.start_jump(character)
     end
   end
