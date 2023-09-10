@@ -241,7 +241,12 @@ function Grapple.pulling_tick(grapple)
   local velocity = floater.velocity
   local position = FloatingMovement.ground_position(character)
   local delta = util.vectors_delta(position, grapple.target_position)
-  local direction = util.vector_normalise(delta)
+  local direction
+  if util.vector_length(delta) < 0.0001 then
+    direction = {x=0, y=0}
+  else
+    direction = util.vector_normalise(delta)
+  end
 
 
   -- Stop pull

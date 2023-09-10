@@ -229,7 +229,10 @@ function util.swap_character(old, new_name)
   end
   
   
-  -- Inventory and equipment  
+  -- Inventory, equipment, cursor
+  if hand_location then
+    new.player.hand_location = hand_location
+  end
   util.swap_entity_inventories(old, new, defines.inventory.character_armor)
   if old.grid then
     util.copy_grid(old.grid, new.grid)
@@ -239,11 +242,10 @@ function util.swap_character(old, new_name)
   util.swap_entity_inventories(old, new, defines.inventory.character_guns)
   util.swap_entity_inventories(old, new, defines.inventory.character_ammo)
   util.swap_entity_inventories(old, new, defines.inventory.character_trash)
-  
+
   util.restore_crafting_queue(new, saved_queue, queue_progress)
   new.character_inventory_slots_bonus = new.character_inventory_slots_bonus - buffer_capacity 
-  
-  -- Cursor
+
   if clipboard_blueprint and clipboard_blueprint.valid_for_read then
     if cursor_is_copy_paste then
       new.player.activate_paste()
@@ -256,8 +258,8 @@ function util.swap_character(old, new_name)
       -- swap, unless this is a deconstruction planner or blank blueprint, created via shortcut 
       new.cursor_stack.swap_stack(old.cursor_stack)
     end
-  end  
-  new.player.hand_location = hand_location
+  end
+
   
   local event_table = {
     new_unit_number = new.unit_number,
@@ -644,6 +646,7 @@ end
 
 function util.vector_normalise(a)
   local length = util.vector_length(a)
+  if length < 0.0001 then return {x=0, y=0} end
   return {x = a.x/length, y = a.y/length}
 end
 
