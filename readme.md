@@ -3,8 +3,8 @@ Jump and Swing
 
 This mod replaces the movement mechanics of Earendel's grappling gun mod and adds a jump button. Unlike with the original grappling gun mod, with this one you can preserve your momentum and swing around. Preserving your momentum becomes a small challenge to keep movement interesting as you explore the world.
 
-[Demo Video](https://www.youtube.com/watch?v=ktT1L1qayZU)
-[Longer Video](https://www.youtube.com/watch?v=e4Srh70Wrn8)
+![Short Demo](https://raw.githubusercontent.com/BlueOne/factorio-jump-and-swing/main/.web/grappling-hook-mod-portal.mp4)
+[__▶ Longer Demonstration__](https://www.youtube.com/watch?v=e4Srh70Wrn8)
 
 How to use
 ----------
@@ -14,7 +14,7 @@ To jump, you need to unlock a technology and set up a hotkey, per default, the j
 Compatibility
 -------------
 
-Use auto saves when using other mods that affect the player character, in particular the model or movement. If you come across issues with other mods that aren't listed below, feel free to ask (on the discussion page or on discord).
+Some work towards compatibility with other mods has been done, but it is difficult in some places. Use frequent auto saves when using other mods that affect the player character, in particular the model or movement. If you come across issues with other mods that aren't listed below, feel free to ask (on the discussion page or on discord).
 
 * Other mods that enable fancy character movement might not work.
 * Mods that switch the character in runtime are not supported. A mod that swaps the character model before you start playing is probably fine, but if the character gets replaced while the game is running, then you will have problems.
@@ -29,12 +29,13 @@ Known incompatible:
 * Adaptive movement speed
 * Caffeine
 * RPG mods
-* Snowball Mod
+
 
 Uninstalling
 -----------
 
 Do not uninstall this mod while players are still in a floating state i.e. jumping or hooking.
+
 
 Acknowledgements
 ----------------
@@ -44,4 +45,4 @@ This mod relies on graphics of the grappling gun mod and contains modified parts
 Notes for mod makers
 --------------------
 
-This mod can provide an interface so that it is easier to create other movement mods while also keeping them compatible. For example sliding across ice, floating across water, gliding with a parachute, dashing, all while being able to jump, grapple etc. As this hasn't been used yet, it is only slightly more than half done. Contact me if you would like to use this.
+This mod can provide an interface so that it is easier to create other movement mods while also keeping them compatible. For example sliding across ice, floating across water, gliding with a parachute, all while being able to jump, grapple etc. As this hasn't been used yet, it is only slightly more than half done. Contact me if you would like to use this. 

@@ -135,7 +135,8 @@ end
 util.on_character_swapped_event = "on_character_swapped"
 
 
--- I've modified this slightly from the original version. In particular, bots are no longer kept in a global variable to respawn later, as I wasn't sure if that does anything.
+-- I've modified this slightly from the original version. This may have introduced some bugs. 
+-- In particular, bots are no longer kept in a global variable to respawn later, as I wasn't sure if that does anything.
 -- Does not check if the target location is safe to spawn the new character, if collision masks change. 
 function util.swap_character(old, new_name)
   if not game.entity_prototypes[new_name] then error("No entity of type "..new_name.." found! "); return end
@@ -230,9 +231,6 @@ function util.swap_character(old, new_name)
   
   
   -- Inventory, equipment, cursor
-  if hand_location then
-    new.player.hand_location = hand_location
-  end
   util.swap_entity_inventories(old, new, defines.inventory.character_armor)
   if old.grid then
     util.copy_grid(old.grid, new.grid)
@@ -258,6 +256,9 @@ function util.swap_character(old, new_name)
       -- swap, unless this is a deconstruction planner or blank blueprint, created via shortcut 
       new.cursor_stack.swap_stack(old.cursor_stack)
     end
+  end
+  if hand_location then
+    new.player.hand_location = hand_location
   end
 
   

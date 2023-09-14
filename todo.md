@@ -2,17 +2,12 @@
 TODO
 =====
 
-Post Release Todos
-------------------
-
 Gameplay/Animation Details
 
-* Video on mod portal page
+* Replace character only when single player
 * Make early grapple feel slightly better
 * Water hook projectile graphic
-* Landing in water bug
 * Handle script_raised_teleport
-* Github Repo
 
 Design
 
