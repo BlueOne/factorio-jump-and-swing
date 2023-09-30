@@ -1,15 +1,39 @@
 local Event = require("__stdlib__/stdlib/event/event.lua")
 
+local remote_events = {}
 function Event.register_custom_event(name, handler, filter, pattern, options)
   local id = Event.get_event_name(name)
   if not id then id = Event.generate_event_name(name) end
   Event.register(id, handler, filter, pattern, options)
+  if not filter and not pattern then
+    remote_events[name] = handler
+  end
 end
 
-function Event.raise_custom_event(name, event_table)
-  local id = Event.get_event_name(name)
-  if not id then error("Custom Event does not exist: "..name) end
-  Event.raise_event(id, event_table)
+local function setup_remote_event_interface()
+  remote.add_interface("jump-and-swing_events", remote_events)
+end
+Event.on_load(setup_remote_event_interface)
+Event.on_init(setup_remote_event_interface)
+
+function Event.raise_remote_event(event_name, event_table)
+  local responses = {}
+  for interface_name, interface_functions in pairs(remote.interfaces) do
+      if interface_functions[event_name] then
+          responses[interface_name] = remote.call(interface_name, event_name, event_table)
+      end
+  end
+  return responses
+end
+
+-- Raise a custom-generated event and call matching remote interfaces
+function Event.raise_custom_event(event_name, event_table)
+  -- if event_name == "on_character_swapped" then error(serpent.line(event_table.old_character.valid)) end
+  local id = Event.get_event_name(event_name)
+  Event.raise_remote_event(event_name, event_table)
+  if id then
+    Event.raise_event(id, event_table)
+  end
 end
 
 remote.add_interface(Mod_Prefix.."Event", {

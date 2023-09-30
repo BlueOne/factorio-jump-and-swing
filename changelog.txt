@@ -1,4 +1,13 @@
 ---------------------------------------------------------------------------------------------------
+Version: 0.1.5
+Date: 2023.09.30
+  Info:
+    - Fix crash when the character reached the hook projectile's exact position
+    - Fix that personal construction bots got detached from the player when jumping
+    - Hooking in water is moved to the tier 3 research. Jumping in water is still tier 2.
+    - Offer the same interface for character swaps as Jetpack mod, for improved compatibility.
+
+---------------------------------------------------------------------------------------------------
 Version: 0.1.4
 Date: 2023.09.09
   Info:

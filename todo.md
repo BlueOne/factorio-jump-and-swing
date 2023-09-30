@@ -4,6 +4,9 @@ TODO
 
 Gameplay/Animation Details
 
+* Personal Bots get detached
+
+
 * Replace character only when single player
 * Make early grapple feel slightly better
 * Water hook projectile graphic

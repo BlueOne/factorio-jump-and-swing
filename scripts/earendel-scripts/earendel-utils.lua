@@ -1,5 +1,4 @@
-
--- License: Earendel FMLDOL 
+-- License: Earendel FMLDOL
 -- https://docs.google.com/document/d/1z-6hZQekEHOu1Pk4z-V5LuwlHnveFLJGTjVAtjYHwMU
 -- Copied from the jetpack and grappling gun mod and modified by unique2 with permission from earendel
 
@@ -28,7 +27,7 @@ util.no_floating_tiles = {
 }
 
 function util.movement_collision_bounce(character)
-  local tiles = character.surface.find_tiles_filtered{area = Util.position_to_area(character.position, 1.49)}
+  local tiles = character.surface.find_tiles_filtered { area = Util.position_to_area(character.position, 1.49) }
   local best_vector
   local best_distance
   for _, tile in pairs(tiles) do
@@ -49,34 +48,35 @@ function util.movement_collision_bounce(character)
   else
     local x_part = (character.position.x % 1 + 1) % 1 - 0.5
     local y_part = (character.position.y % 1 + 1) % 1 - 0.5
-    local new_velocity = {x = x_part, y = y_part}
+    local new_velocity = { x = x_part, y = y_part }
     new_velocity = Util.vector_set_length(new_velocity, 0.05)
     return new_velocity
   end
 end
-
-
 
 -- Swap or transfer properties of entities
 -----------------------------------------------------------
 
 function util.get_robot_collection(old, new)
   if old.logistic_cell and old.logistic_cell.logistic_network and #old.logistic_cell.logistic_network.robots > 0 then
-    return {entity = new, robots = old.logistic_cell.logistic_network.robots}
+    return { entity = new, robots = old.logistic_cell.logistic_network.robots }
   end
 end
 
 function util.reattach_robot_collection(robot_collection)
-  if not robot_collection then return end
+  if not robot_collection then return true end
   local entity = robot_collection.entity
+  if not (entity and entity.valid) then return true end
   if entity.logistic_cell and entity.logistic_cell.valid
-  and entity.logistic_cell.logistic_network and entity.logistic_cell.logistic_network.valid then
+      and entity.logistic_cell.logistic_network and entity.logistic_cell.logistic_network.valid then
     for _, robot in pairs(robot_collection.robots) do
       if robot.valid and robot.surface == entity.surface then
         robot.logistic_network = entity.logistic_cell.logistic_network
       end
     end
+    return true
   end
+  return false
 end
 
 function util.copy_logistic_slots(old, new)
@@ -103,11 +103,9 @@ function util.copy_logistic_slots(old, new)
   end
 end
 
-
-
 function util.copy_grid(grid_a, grid_b)
   for _, old_eq in pairs(grid_a.equipment) do
-    local new_eq = grid_b.put{name = old_eq.name, position = old_eq.position}
+    local new_eq = grid_b.put { name = old_eq.name, position = old_eq.position }
     if new_eq and new_eq.valid then
       if old_eq.type == "energy-shield-equipment" then
         new_eq.shield = old_eq.shield
@@ -120,9 +118,9 @@ function util.copy_grid(grid_a, grid_b)
           new_eq.burner.inventory.insert(old_eq.burner.inventory[i])
         end
         for i = 1, #old_eq.burner.burnt_result_inventory do
-          new_eq.burner.burnt_result_inventory.insert (old_eq.burner.burnt_result_inventory[i])
+          new_eq.burner.burnt_result_inventory.insert(old_eq.burner.burnt_result_inventory[i])
         end
-        
+
         new_eq.burner.currently_burning = old_eq.burner.currently_burning
         new_eq.burner.heat = old_eq.burner.heat
         new_eq.burner.remaining_burning_fuel = old_eq.burner.remaining_burning_fuel
@@ -131,40 +129,41 @@ function util.copy_grid(grid_a, grid_b)
   end
 end
 
-
 util.on_character_swapped_event = "on_character_swapped"
 
 
--- I've modified this slightly from the original version. This may have introduced some bugs. 
+-- I've modified this slightly from the original version. This may have introduced some bugs.
 -- In particular, bots are no longer kept in a global variable to respawn later, as I wasn't sure if that does anything.
--- Does not check if the target location is safe to spawn the new character, if collision masks change. 
+-- Does not check if the target location is safe to spawn the new character, if collision masks change.
 function util.swap_character(old, new_name)
-  if not game.entity_prototypes[new_name] then error("No entity of type "..new_name.." found! "); return end
+  if not game.entity_prototypes[new_name] then
+    error("No entity of type " .. new_name .. " found! "); return
+  end
   local position = old.position
-  local new = old.surface.create_entity{
+  local new = old.surface.create_entity {
     name = new_name,
     position = position,
     force = old.force,
     direction = old.direction,
   }
-  
+
   new.copy_settings(old)
-  
+
   for _, k in pairs({
     "character_running_speed_modifier",
     "character_crafting_speed_modifier",
-    "character_mining_speed_modifier", 
-    "character_additional_mining_categories", 
-    "character_running_speed_modifier", "character_build_distance_bonus", 
-    "character_item_drop_distance_bonus", 
-    "character_reach_distance_bonus", 
-    "character_resource_reach_distance_bonus", 
-    "character_item_pickup_distance_bonus", 
-    "character_loot_pickup_distance_bonus", 
-    "character_inventory_slots_bonus", 
-    "character_trash_slot_count_bonus", 
-    "character_maximum_following_robot_count_bonus", 
-    "character_health_bonus", 
+    "character_mining_speed_modifier",
+    "character_additional_mining_categories",
+    "character_running_speed_modifier", "character_build_distance_bonus",
+    "character_item_drop_distance_bonus",
+    "character_reach_distance_bonus",
+    "character_resource_reach_distance_bonus",
+    "character_item_pickup_distance_bonus",
+    "character_loot_pickup_distance_bonus",
+    "character_inventory_slots_bonus",
+    "character_trash_slot_count_bonus",
+    "character_maximum_following_robot_count_bonus",
+    "character_health_bonus",
     "character_personal_logistic_requests_enabled",
     "health",
     "selected_gun_index",
@@ -179,25 +178,26 @@ function util.swap_character(old, new_name)
   }) do
     new[k] = old[k]
   end
-  
+
   -- Bots
   local robot_collection = util.get_robot_collection(old, new)
-  util.reattach_robot_collection(robot_collection)
-  
-  for _, robot in pairs (old.following_robots) do
+  global.robot_collections = global.robot_collections or {} -- TODO: Remove this
+  table.insert(global.robot_collections, robot_collection)
+
+  for _, robot in pairs(old.following_robots) do
     robot.combat_robot_owner = new
   end
   util.copy_logistic_slots(old, new)
   new.character_personal_logistic_requests_enabled = old.character_personal_logistic_requests_enabled
   new.allow_dispatching_robots = old.allow_dispatching_robots
-  
-  
+
+
   -- Stop overflow when manipulating inventory, crafting-queue and armor
   local buffer_capacity = 1000
   new.character_inventory_slots_bonus = old.character_inventory_slots_bonus + buffer_capacity
   old.character_inventory_slots_bonus = old.character_inventory_slots_bonus + buffer_capacity
-  
-  
+
+
   -- Store variables for restoring after switching character controller
   local hand_location
   if old.player then
@@ -206,8 +206,8 @@ function util.swap_character(old, new_name)
   local vehicle = old.vehicle
   local opened_self = old.player and old.player.opened_self
   local saved_queue, queue_progress = util.store_crafting_queue(old)
-  
-  
+
+
   local clipboard_blueprint
   local cursor_is_copy_paste
   if old.player then
@@ -225,11 +225,11 @@ function util.swap_character(old, new_name)
 
 
   if old.player then
-    old.player.set_controller{type=defines.controllers.character, character=new}
+    old.player.set_controller { type = defines.controllers.character, character = new }
     if opened_self then new.player.opened = new end
   end
-  
-  
+
+
   -- Inventory, equipment, cursor
   util.swap_entity_inventories(old, new, defines.inventory.character_armor)
   if old.grid then
@@ -242,7 +242,7 @@ function util.swap_character(old, new_name)
   util.swap_entity_inventories(old, new, defines.inventory.character_trash)
 
   util.restore_crafting_queue(new, saved_queue, queue_progress)
-  new.character_inventory_slots_bonus = new.character_inventory_slots_bonus - buffer_capacity 
+  new.character_inventory_slots_bonus = new.character_inventory_slots_bonus - buffer_capacity
 
   if clipboard_blueprint and clipboard_blueprint.valid_for_read then
     if cursor_is_copy_paste then
@@ -252,29 +252,29 @@ function util.swap_character(old, new_name)
     end
   elseif old.cursor_stack and old.cursor_stack.valid_for_read then
     if not (hand_location == nil and (old.cursor_stack.type == "deconstruction-item" or (old.cursor_stack.type == "blueprint"
-    and not old.cursor_stack.is_blueprint_setup()))) then
-      -- swap, unless this is a deconstruction planner or blank blueprint, created via shortcut 
+          and not old.cursor_stack.is_blueprint_setup()))) then
+      -- swap, unless this is a deconstruction planner or blank blueprint, created via shortcut
       new.cursor_stack.swap_stack(old.cursor_stack)
     end
   end
-  if hand_location then
+  if hand_location and new.get_inventory(hand_location.inventory)[hand_location.slot].valid_for_read == false then
     new.player.hand_location = hand_location
   end
 
-  
+
   local event_table = {
     new_unit_number = new.unit_number,
     old_unit_number = old.unit_number,
     new_character = new,
-    old_character = old
+    old_character = old,
   }
   Event.raise_custom_event(util.on_character_swapped_event, event_table)
-  
-  
-  
+
   if old.valid then
     old.destroy()
   end
+
+
   if vehicle then
     if not vehicle.get_driver() then
       vehicle.set_driver(new)
@@ -282,9 +282,24 @@ function util.swap_character(old, new_name)
       vehicle.set_passenger(new)
     end
   end
-  
+
   return new
 end
+
+
+Event.register(defines.events.on_tick, function()
+  if global.robot_collections then
+    for k, robot_collection in pairs(global.robot_collections) do
+      if util.reattach_robot_collection(robot_collection) then
+        global.robot_collections[k] = nil
+      end
+    end
+  end
+end)
+Event.on_init(function()
+  global.robot_collections = global.robot_collections or {}
+end)
+
 
 
 -- Make sure there is enough inventory space (e.g. increase character.character_inventory_slots_bonus) when using this
@@ -298,11 +313,10 @@ function util.store_crafting_queue(character)
       table.insert(saved_queue, character.crafting_queue[i])
       character.cancel_crafting(character.crafting_queue[i])
       i = character.crafting_queue_size
-    end  
+    end
   end
   return saved_queue, queue_progress
 end
-
 
 function util.restore_crafting_queue(character, saved_queue, queue_progress)
   if saved_queue then
@@ -318,7 +332,7 @@ function util.restore_crafting_queue(character, saved_queue, queue_progress)
   end
 end
 
-function util.transfer_burner_direct (burner_a, burner_b)
+function util.transfer_burner_direct(burner_a, burner_b)
   if burner_a and burner_b then
     burner_b.heat = burner_a.heat
     if burner_a.currently_burning then
@@ -334,79 +348,79 @@ function util.transfer_burner_direct (burner_a, burner_b)
   end
 end
 
-function util.transfer_burner (entity_a, entity_b)
-util.transfer_burner_direct (entity_a.burner, entity_b.burner)
+function util.transfer_burner(entity_a, entity_b)
+  util.transfer_burner_direct(entity_a.burner, entity_b.burner)
 end
 
-function util.copy_inventory (inv_a, inv_b, probability)
+function util.copy_inventory(inv_a, inv_b, probability)
   if not probability then probability = 1 end
   if inv_a and inv_b then
-      local contents = inv_a.get_contents()
-      for item_type, item_count in pairs(contents) do
-          if probability == 1 or probability > math.random() then
-            inv_b.insert({name=item_type, count=item_count})
-          end
+    local contents = inv_a.get_contents()
+    for item_type, item_count in pairs(contents) do
+      if probability == 1 or probability > math.random() then
+        inv_b.insert({ name = item_type, count = item_count })
       end
+    end
   end
 end
 
-function util.move_inventory_items (inv_a, inv_b)
--- move all items from inv_a to inv_b
--- preserves item data but inv_b MUST be able to accept the items or they are lost.
--- inventory A is cleared.
-for i = 1, util.min(#inv_a, #inv_b) do
-  if inv_a[i] and inv_a[i].valid then
-    inv_b.insert(inv_a[i])
+function util.move_inventory_items(inv_a, inv_b)
+  -- move all items from inv_a to inv_b
+  -- preserves item data but inv_b MUST be able to accept the items or they are lost.
+  -- inventory A is cleared.
+  for i = 1, util.min(#inv_a, #inv_b) do
+    if inv_a[i] and inv_a[i].valid then
+      inv_b.insert(inv_a[i])
+    end
   end
-end
-inv_a.clear()
+  inv_a.clear()
 end
 
-function util.transfer_inventory_filters (entity_a, entity_b, inventory_type)
+function util.transfer_inventory_filters(entity_a, entity_b, inventory_type)
   local inv_a = entity_a.get_inventory(inventory_type)
   local inv_b = entity_b.get_inventory(inventory_type)
   if inv_a.supports_filters() and inv_b.supports_filters() then
-      for i = 1, util.min(#inv_a, #inv_b) do
-          local filter = inv_a.get_filter(i)
-          if filter then
-              inv_b.set_filter(i, filter)
-          end
+    for i = 1, util.min(#inv_a, #inv_b) do
+      local filter = inv_a.get_filter(i)
+      if filter then
+        inv_b.set_filter(i, filter)
       end
-  end
-end
-
-function util.copy_equipment_grid (entity_a, entity_b)
-if not (entity_a.grid and entity_b.grid) then return end
-for _, a_eq in pairs(entity_a.grid.equipment) do
-  local b_eq = entity_b.grid.put{name = a_eq.name, position = a_eq.position}
-  if b_eq and b_eq.valid then
-    if a_eq.type == "energy-shield-equipment" then
-      b_eq.shield = a_eq.shield
-    end
-    if a_eq.energy then
-      b_eq.energy = a_eq.energy
-    end
-    if a_eq.burner then
-      for i = 1, #a_eq.burner.inventory do
-        b_eq.burner.inventory.insert(a_eq.burner.inventory[i])
-      end
-      for i = 1, #a_eq.burner.burnt_result_inventory do
-        b_eq.burner.burnt_result_inventory.insert (a_eq.burner.burnt_result_inventory[i])
-      end
-
-      b_eq.burner.currently_burning = a_eq.burner.currently_burning
-      b_eq.burner.heat = a_eq.burner.heat
-      b_eq.burner.remaining_burning_fuel = a_eq.burner.remaining_burning_fuel
     end
   end
 end
-entity_b.grid.inhibit_movement_bonus = entity_a.grid.inhibit_movement_bonus
+
+function util.copy_equipment_grid(entity_a, entity_b)
+  if not (entity_a.grid and entity_b.grid) then return end
+  for _, a_eq in pairs(entity_a.grid.equipment) do
+    local b_eq = entity_b.grid.put { name = a_eq.name, position = a_eq.position }
+    if b_eq and b_eq.valid then
+      if a_eq.type == "energy-shield-equipment" then
+        b_eq.shield = a_eq.shield
+      end
+      if a_eq.energy then
+        b_eq.energy = a_eq.energy
+      end
+      if a_eq.burner then
+        for i = 1, #a_eq.burner.inventory do
+          b_eq.burner.inventory.insert(a_eq.burner.inventory[i])
+        end
+        for i = 1, #a_eq.burner.burnt_result_inventory do
+          b_eq.burner.burnt_result_inventory.insert(a_eq.burner.burnt_result_inventory[i])
+        end
+
+        b_eq.burner.currently_burning = a_eq.burner.currently_burning
+        b_eq.burner.heat = a_eq.burner.heat
+        b_eq.burner.remaining_burning_fuel = a_eq.burner.remaining_burning_fuel
+      end
+    end
+  end
+  entity_b.grid.inhibit_movement_bonus = entity_a.grid.inhibit_movement_bonus
 end
 
-function util.transfer_equipment_grid (entity_a, entity_b)
-if not (entity_a.grid and entity_b.grid) then return end
-util.copy_equipment_grid (entity_a, entity_b)
-entity_a.grid.clear()
+function util.transfer_equipment_grid(entity_a, entity_b)
+  if not (entity_a.grid and entity_b.grid) then return end
+  util.copy_equipment_grid(entity_a, entity_b)
+  entity_a.grid.clear()
 end
 
 function util.swap_entity_inventories(entity_a, entity_b, inventory)
@@ -419,24 +433,22 @@ function util.swap_inventories(inv_a, inv_b)
       inv_b.set_filter(i, inv_a.get_filter(i))
     end
   end
-  for i = 1, math.min(#inv_a, #inv_b)do
+  for i = 1, math.min(#inv_a, #inv_b) do
     inv_b[i].swap_stack(inv_a[i])
   end
 end
-
-
 
 -- Graphics
 ------------------------------------------------------------
 
 function util.create_particle_circle(surface, position, nb_particles, particle_name, particle_speed)
-  for orientation=0, 1, 1/nb_particles do
+  for orientation = 0, 1, 1 / nb_particles do
     local fuzzed_orientation = orientation + math.random() * 0.1
     local vector = util.orientation_to_vector(fuzzed_orientation, particle_speed)
     -- local v = util.copy(vector)
     -- if velocity and util.vector_length(velocity) > 0.01 then v = util.vectors_add(vector, util.vector_multiply(velocity, 1)) end
 
-    surface.create_particle{
+    surface.create_particle {
       name = particle_name,
       position = util.vectors_add(position, vector),
       movement = vector,
@@ -453,31 +465,32 @@ function util.animate_landing(character, landing_tile, particle_mult, speed_mult
   local position = character.position
   if not particle_mult then particle_mult = 1 end
   if not speed_mult then speed_mult = 1 end
-  
+
   if string.find(landing_tile.name, "water", 1, true) then
     -- Water splash
-    util.create_particle_circle(character.surface, position, NB_WATER_DROPLETS * particle_mult, "water-particle", 0.05 * speed_mult)
-    character.surface.play_sound({path="tile-walking/water-shallow", position=position})
+    util.create_particle_circle(character.surface, position, NB_WATER_DROPLETS * particle_mult, "water-particle",
+      0.05 * speed_mult)
+    character.surface.play_sound({ path = "tile-walking/water-shallow", position = position })
   else
     -- Dust
     local particle_name = landing_tile.name .. "-dust-particle"
     if not game.particle_prototypes[particle_name] then
       particle_name = "sand-1-dust-particle"
     end
-    util.create_particle_circle(character.surface, position, NB_DUST_PUFFS * particle_mult, particle_name, 0.1 * speed_mult)
-    local sound_path = "tile-walking/"..landing_tile.name
+    util.create_particle_circle(character.surface, position, NB_DUST_PUFFS * particle_mult, particle_name,
+      0.1 * speed_mult)
+    local sound_path = "tile-walking/" .. landing_tile.name
     if game.is_valid_sound_path(sound_path) then
-      character.surface.play_sound({path=sound_path, position=position})
+      character.surface.play_sound({ path = sound_path, position = position })
     end
   end
 end
-
 
 -- Table
 ------------------------------------------------------------
 
 
-function util.shallow_copy (t) -- shallow-copy a table
+function util.shallow_copy(t)  -- shallow-copy a table
   if type(t) ~= "table" then return t end
   local meta = getmetatable(t)
   local target = {}
@@ -488,75 +501,74 @@ end
 
 function util.remove_from_table(list, item)
   local index = 0
-  for _,_item in ipairs(list) do
-      if item == _item then
-          index = _
-          break
-      end
+  for _, _item in ipairs(list) do
+    if item == _item then
+      index = _
+      break
+    end
   end
   if index > 0 then
-      util.remove(list, index)
+    util.remove(list, index)
   end
 end
 
-function util.shuffle (tbl)
-size = #tbl
-for i = size, 1, -1 do
-  --local rand = 1 + math.floor(size * (math.random() - 0.0000001))
-  local rand = math.random(size)
-  tbl[i], tbl[rand] = tbl[rand], tbl[i]
-end
-return tbl
-end
-
-function util.random_from_array (tbl)
---return tbl[1 + math.floor(#tbl * (math.random() - 0.0000001))]
-return tbl[math.random(#tbl)]
+function util.shuffle(tbl)
+  size = #tbl
+  for i = size, 1, -1 do
+    --local rand = 1 + math.floor(size * (math.random() - 0.0000001))
+    local rand = math.random(size)
+    tbl[i], tbl[rand] = tbl[rand], tbl[i]
+  end
+  return tbl
 end
 
+function util.random_from_array(tbl)
+  --return tbl[1 + math.floor(#tbl * (math.random() - 0.0000001))]
+  return tbl[math.random(#tbl)]
+end
 
 -- Geometry
 ------------------------------------------------------------
 
 function util.area_add_position(area, position)
-local area2 = table.deepcopy(area)
-for k1, v1 in pairs(area2) do
-  for k2, v2 in pairs(v1) do
-    if k2 == 1 or k2 == "x" then
-      v1[k2] = v2 + (position.x or position[1])
-    elseif k2 == 2 or k2 == "y" then
-      v1[k2] = v2 + (position.y or position[2])
+  local area2 = table.deepcopy(area)
+  for k1, v1 in pairs(area2) do
+    for k2, v2 in pairs(v1) do
+      if k2 == 1 or k2 == "x" then
+        v1[k2] = v2 + (position.x or position[1])
+      elseif k2 == 2 or k2 == "y" then
+        v1[k2] = v2 + (position.y or position[2])
+      end
     end
   end
-end
-return area2
+  return area2
 end
 
 function util.area_extend(area, range)
-local area2 = table.deepcopy(area)
-for k1, v1 in pairs(area2) do
-  local m = 1
-  if k1 == 1 or k1 == "left_top" then
-    m = -1
+  local area2 = table.deepcopy(area)
+  for k1, v1 in pairs(area2) do
+    local m = 1
+    if k1 == 1 or k1 == "left_top" then
+      m = -1
+    end
+    for k2, v2 in pairs(v1) do
+      v1[k2] = v2 + range * m
+    end
   end
-  for k2, v2 in pairs(v1) do
-    v1[k2] = v2 + range * m
-  end
-end
-return area2
+  return area2
 end
 
 function util.position_to_area(position, radius)
-return {{x = position.x - radius, y = position.y - radius},
-        {x = position.x + radius, y = position.y + radius}}
+  return { { x = position.x - radius, y = position.y - radius },
+    { x = position.x + radius, y = position.y + radius } }
 end
 
 function util.position_to_tile(position)
-  return {x = math.floor(position.x), y = math.floor(position.y)}
+  return { x = math.floor(position.x), y = math.floor(position.y) }
 end
 
 function util.tile_to_position(tile_position)
-  return {x = tile_position.x+0.5, y = tile_position.y+0.5}
+  return { x = tile_position.x + 0.5, y = tile_position.y + 0.5 }
 end
 
 function util.position_to_xy_string(position)
@@ -575,15 +587,15 @@ function util.lerp_angles(a, b, alpha)
   local da = b - a
 
   if da <= -0.5 then
-      da = da + 1
+    da = da + 1
   elseif da >= 0.5 then
-      da = da - 1
+    da = da - 1
   end
   local na = a + da * alpha
   if na < 0 then
-      na = na + 1
+    na = na + 1
   elseif na >= 1 then
-      na = na - 1
+    na = na - 1
   end
   return na
 end
@@ -592,31 +604,31 @@ function util.step_angles(a, b, step)
   local da = b - a
 
   if da <= -0.5 then
-      da = da + 1
+    da = da + 1
   elseif da >= 0.5 then
-      da = da - 1
+    da = da - 1
   end
   local na = a + Util.sign(da) * math.min(math.abs(da), step)
   if na < 0 then
-      na = na + 1
+    na = na + 1
   elseif na >= 1 then
-      na = na - 1
+    na = na - 1
   end
   return na
 end
 
 function util.array_to_vector(array)
-  return {x = array[1], y = array[2]}
+  return { x = array[1], y = array[2] }
 end
 
 -- deprecated, use vector_diff instead
 function util.vectors_delta(a, b) -- from a to b
-if not a and b then return 0 end
-return {x = b.x - a.x, y = b.y - a.y}
+  if not a and b then return 0 end
+  return { x = b.x - a.x, y = b.y - a.y }
 end
 
 function util.vector_diff(a, b) -- from a to b
-return {x = a.x - b.x, y = a.y - b.y}
+  return { x = a.x - b.x, y = a.y - b.y }
 end
 
 function util.vectors_delta_length(a, b)
@@ -636,25 +648,25 @@ function util.vector_dot(a, b)
 end
 
 function util.vector_multiply(a, multiplier)
-  return {x = a.x * multiplier, y = a.y * multiplier}
+  return { x = a.x * multiplier, y = a.y * multiplier }
 end
 
 function util.vector_dot_projection(a, b)
   local n = util.vector_normalise(a)
   local d = util.vector_dot(n, b)
-  return {x = n.x * d, y = n.y * d}
+  return { x = n.x * d, y = n.y * d }
 end
 
 function util.vector_normalise(a)
   local length = util.vector_length(a)
-  if length < 0.0001 then return {x=0, y=0} end
-  return {x = a.x/length, y = a.y/length}
+  if length < 0.0001 then return { x = 0, y = 0 } end
+  return { x = a.x / length, y = a.y / length }
 end
 
 function util.vector_set_length(a, length)
   local old_length = util.vector_length(a)
-  if old_length == 0 then return {x = 0, y = -length} end
-  return {x = a.x/old_length*length, y = a.y/old_length*length}
+  if old_length == 0 then return { x = 0, y = -length } end
+  return { x = a.x / old_length * length, y = a.y / old_length * length }
 end
 
 function util.orientation_from_to(a, b)
@@ -662,35 +674,36 @@ function util.orientation_from_to(a, b)
 end
 
 function util.orientation_to_vector(orientation, length)
-  return {x = length * util.sin(orientation * 2 * util.pi), y = -length * util.cos(orientation * 2 * util.pi)}
+  return { x = length * util.sin(orientation * 2 * util.pi), y = -length * util.cos(orientation * 2 * util.pi) }
 end
 
 function util.rotate_vector(orientation, a)
   return {
     x = -a.y * util.sin(orientation * 2 * util.pi) + a.x * util.sin((orientation + 0.25) * 2 * util.pi),
-    y = a.y * util.cos(orientation * 2 * util.pi) -a.x * util.cos((orientation + 0.25) * 2 * util.pi)}
+    y = a.y * util.cos(orientation * 2 * util.pi) - a.x * util.cos((orientation + 0.25) * 2 * util.pi)
+  }
 end
 
 function util.vectors_add(a, b)
-  return {x = a.x + b.x, y = a.y + b.y}
+  return { x = a.x + b.x, y = a.y + b.y }
 end
 
 function util.vectors_cos_angle(a, b)
-return util.vector_dot(a, b) / util.vector_length(a) / util.vector_length(b)
+  return util.vector_dot(a, b) / util.vector_length(a) / util.vector_length(b)
 end
 
 function util.lerp_vectors(a, b, alpha)
-  return {x = a.x + (b.x - a.x) * alpha, y = a.y + (b.y - a.y) * alpha}
+  return { x = a.x + (b.x - a.x) * alpha, y = a.y + (b.y - a.y) * alpha }
 end
 
 function util.vector_distance_squared(a, b)
   local x = a.x - b.x
   local y = a.y - b.y
-  return x*x + y*y
+  return x * x + y * y
 end
 
 function util.vector_distance(a, b)
-  return util.sqrt(util.vector_distance_squared(a,b))
+  return util.sqrt(util.vector_distance_squared(a, b))
 end
 
 function util.move_to(a, b, max_distance, eliptical)
@@ -699,17 +712,17 @@ function util.move_to(a, b, max_distance, eliptical)
   local eliptical_scale = 0.9
   local delta = util.vectors_delta(a, b)
   if eliptical then
-      delta.y = delta.y / eliptical_scale
+    delta.y = delta.y / eliptical_scale
   end
   local length = util.vector_length(delta)
   if (length > max_distance) then
-      local partial = max_distance / length
-      delta = {x = delta.x * partial, y = delta.y * partial}
+    local partial = max_distance / length
+    delta = { x = delta.x * partial, y = delta.y * partial }
   end
   if eliptical then
-      delta.y = delta.y * eliptical_scale
+    delta.y = delta.y * eliptical_scale
   end
-  return {x = a.x + delta.x, y = a.y + delta.y}
+  return { x = a.x + delta.x, y = a.y + delta.y }
 end
 
 function util.vector_to_orientation(v)
@@ -718,47 +731,47 @@ end
 
 function util.vector_to_orientation_xy(x, y)
   if x == 0 then
-      if y > 0 then
-          return 0.5
-      else
-          return 0
-      end
+    if y > 0 then
+      return 0.5
+    else
+      return 0
+    end
   elseif y == 0 then
-      if x < 0 then
-          return 0.75
-      else
-          return 0.25
-      end
+    if x < 0 then
+      return 0.75
+    else
+      return 0.25
+    end
   else
-      if y < 0 then
-          if x > 0 then
-              return util.atan(x / -y) / util.pi / 2
-          else
-              return 1 + util.atan(x / -y) / util.pi / 2
-          end
+    if y < 0 then
+      if x > 0 then
+        return util.atan(x / -y) / util.pi / 2
       else
-          return 0.5 + util.atan(x / -y) / util.pi / 2
+        return 1 + util.atan(x / -y) / util.pi / 2
       end
+    else
+      return 0.5 + util.atan(x / -y) / util.pi / 2
+    end
   end
 end
 
 function util.direction_to_orientation(direction)
   if direction == defines.direction.north then
-      return 0
+    return 0
   elseif direction == defines.direction.northeast then
-      return 0.125
+    return 0.125
   elseif direction == defines.direction.east then
-      return 0.25
+    return 0.25
   elseif direction == defines.direction.southeast then
-      return 0.375
+    return 0.375
   elseif direction == defines.direction.south then
-      return 0.5
+    return 0.5
   elseif direction == defines.direction.southwest then
-      return 0.625
+    return 0.625
   elseif direction == defines.direction.west then
-      return 0.75
+    return 0.75
   elseif direction == defines.direction.northwest then
-      return 0.875
+    return 0.875
   end
   return 0
 end
@@ -786,19 +799,18 @@ end
 
 function util.direction_to_vector(direction)
   return util.vector_normalise(util.direction_to_vector_unnormalised(direction))
-  end
-  
-  function util.direction_to_vector_unnormalised (direction)
-  if direction == defines.direction.east then return {x=1,y=0} end
-  if direction == defines.direction.north then return {x=0,y=-1} end
-  if direction == defines.direction.northeast then return {x=1,y=-1} end
-  if direction == defines.direction.northwest then return {x=-1,y=-1} end
-  if direction == defines.direction.south then return {x=0,y=1} end
-  if direction == defines.direction.southeast then return {x=1,y=1} end
-  if direction == defines.direction.southwest then return {x=-1,y=1} end
-  if direction == defines.direction.west then return {x=-1,y=0} end
-  end
-  
+end
+
+function util.direction_to_vector_unnormalised(direction)
+  if direction == defines.direction.east then return { x = 1, y = 0 } end
+  if direction == defines.direction.north then return { x = 0, y = -1 } end
+  if direction == defines.direction.northeast then return { x = 1, y = -1 } end
+  if direction == defines.direction.northwest then return { x = -1, y = -1 } end
+  if direction == defines.direction.south then return { x = 0, y = 1 } end
+  if direction == defines.direction.southeast then return { x = 1, y = 1 } end
+  if direction == defines.direction.southwest then return { x = -1, y = 1 } end
+  if direction == defines.direction.west then return { x = -1, y = 0 } end
+end
 
 -- Signals
 -----------------------------------------------------------
@@ -809,33 +821,32 @@ end
 
 function util.signal_container_add(container, signal, count)
   if signal then
-      if not container[signal.type] then
-          container[signal.type] = {}
-      end
-      if container[signal.type][signal.name] then
-          container[signal.type][signal.name].count = container[signal.type][signal.name].count + count
-      else
-          container[signal.type][signal.name] = {signal = signal, count = count}
-      end
+    if not container[signal.type] then
+      container[signal.type] = {}
+    end
+    if container[signal.type][signal.name] then
+      container[signal.type][signal.name].count = container[signal.type][signal.name].count + count
+    else
+      container[signal.type][signal.name] = { signal = signal, count = count }
+    end
   end
 end
 
 function util.signal_container_add_inventory(container, entity, inventory)
   local inv = entity.get_inventory(inventory)
   if inv then
-      local contents = inv.get_contents()
-      for item_type, item_count in pairs(contents) do
-          util.signal_container_add(container, {type="item", name=item_type}, item_count)
-      end
+    local contents = inv.get_contents()
+    for item_type, item_count in pairs(contents) do
+      util.signal_container_add(container, { type = "item", name = item_type }, item_count)
+    end
   end
 end
 
 function util.signal_container_get(container, signal)
   if container[signal.type] and container[signal.type][signal.name] then
-      return container[signal.type][signal.name]
+    return container[signal.type][signal.name]
   end
 end
-
 
 -- Strings
 ------------------------------------------------------------
@@ -853,27 +864,27 @@ util.char_to_multiplier = {
 }
 
 function util.string_to_number(str)
-  str = ""..str
+  str = "" .. str
   local number_string = ""
   local last_char = nil
   for i = 1, #str do
-      local c = str:sub(i,i)
-      if c == "." or (c == "-" and i == 1) or tonumber(c) ~= nil then
-          number_string = number_string .. c
-      else
-          last_char = c
-          break
-      end
+    local c = str:sub(i, i)
+    if c == "." or (c == "-" and i == 1) or tonumber(c) ~= nil then
+      number_string = number_string .. c
+    else
+      last_char = c
+      break
+    end
   end
   if last_char and util.char_to_multiplier[last_char] then
-      return tonumber(number_string) * util.char_to_multiplier[last_char]
+    return tonumber(number_string) * util.char_to_multiplier[last_char]
   end
   return tonumber(number_string)
 end
 
 function util.replace(str, what, with)
   what = util.str_gsub(what, "[%(%)%.%+%-%*%?%[%]%^%$%%]", "%%%1") -- escape pattern
-  with = util.str_gsub(with, "[%%]", "%%%%") -- escape replacement
+  with = util.str_gsub(with, "[%%]", "%%%%")                       -- escape replacement
   return util.str_gsub(str, what, with)
 end
 
@@ -886,17 +897,17 @@ end
 -- end
 
 function util.overwrite_table(table_weak, table_strong)
-for k,v in pairs(table_strong) do table_weak[k] = v end
-return table_weak
+  for k, v in pairs(table_strong) do table_weak[k] = v end
+  return table_weak
 end
 
 function util.table_contains(table, check)
-for k,v in pairs(table) do if v == check then return true end end
-return false
+  for k, v in pairs(table) do if v == check then return true end end
+  return false
 end
 
 function util.table_to_string(table)
-return serpent.block( table, {comment = false, numformat = '%1.8g' } )
+  return serpent.block(table, { comment = false, numformat = '%1.8g' })
 end
 
 function util.table_size(t)
@@ -908,100 +919,95 @@ function util.table_size(t)
 end
 
 function util.values_to_string(table)
-local string = ""
-for _, value in pairs(table) do
-  string = ((string == "") and "" or ", ") .. string .. value
-end
-return string
+  local string = ""
+  for _, value in pairs(table) do
+    string = ((string == "") and "" or ", ") .. string .. value
+  end
+  return string
 end
 
 function util.math_log(value, base)
---logb(a) = logc(a) / logc(b)
-return math.log(value)/math.log(base)
+  --logb(a) = logc(a) / logc(b)
+  return math.log(value) / math.log(base)
 end
 
 function util.seconds_to_clock(seconds)
-local seconds = tonumber(seconds)
+  local seconds = tonumber(seconds)
 
-if seconds <= 0 then
-  return "0";
-else
-  local hours = math.floor(seconds/3600)
-  local mins = math.floor(seconds/60 - (hours*60))
-  local secs = math.floor(seconds - hours*3600 - mins *60)
-  local s_hours = string.format("%02.f",hours);
-  local s_mins = string.format("%02.f", mins);
-  local s_secs = string.format("%02.f", secs);
-  if hours > 0 then
-    return s_hours..":"..s_mins..":"..s_secs
+  if seconds <= 0 then
+    return "0";
+  else
+    local hours = math.floor(seconds / 3600)
+    local mins = math.floor(seconds / 60 - (hours * 60))
+    local secs = math.floor(seconds - hours * 3600 - mins * 60)
+    local s_hours = string.format("%02.f", hours);
+    local s_mins = string.format("%02.f", mins);
+    local s_secs = string.format("%02.f", secs);
+    if hours > 0 then
+      return s_hours .. ":" .. s_mins .. ":" .. s_secs
+    end
+    if mins > 0 then
+      return s_mins .. ":" .. s_secs
+    end
+    if secs == 0 then
+      return "0"
+    end
+    return s_secs
   end
-  if mins > 0 then
-    return s_mins..":"..s_secs
-  end
-  if secs == 0 then
-    return "0"
-  end
-  return s_secs
-end
 end
 
 function util.to_rail_grid(number_or_position)
-if type(number_or_position) == "table" then
-  return {x = util.to_rail_grid(number_or_position.x), y = util.to_rail_grid(number_or_position.y)}
-end
-return math.floor(number_or_position / 2) * 2
+  if type(number_or_position) == "table" then
+    return { x = util.to_rail_grid(number_or_position.x), y = util.to_rail_grid(number_or_position.y) }
+  end
+  return math.floor(number_or_position / 2) * 2
 end
 
 function util.format_fuel(fuel, ceil)
-return string.format("%.2f",(fuel or 0) / 1000).."k"
+  return string.format("%.2f", (fuel or 0) / 1000) .. "k"
 end
 
 function util.format_energy(fuel, ceil)
-if ceil then
-  return math.ceil((fuel or 0) / 1000000000).."GJ"
-else
-  return math.floor((fuel or 0) / 1000000000).."GJ"
+  if ceil then
+    return math.ceil((fuel or 0) / 1000000000) .. "GJ"
+  else
+    return math.floor((fuel or 0) / 1000000000) .. "GJ"
+  end
 end
-end
-
 
 function util.sign(x)
- if x<0 then
-   return -1
- elseif x>0 then
-   return 1
- else
-   return 0
- end
+  if x < 0 then
+    return -1
+  elseif x > 0 then
+    return 1
+  else
+    return 0
+  end
 end
-
-
 
 -- Gui
 ------------------------------------------------------------
 
 
 function util.find_first_descendant_by_name(gui_element, name)
-for _, child in pairs(gui_element.children) do
-  if child.name == name then
-    return child
+  for _, child in pairs(gui_element.children) do
+    if child.name == name then
+      return child
+    end
+    local found = util.find_first_descendant_by_name(child, name)
+    if found then return found end
   end
-  local found = util.find_first_descendant_by_name(child, name)
-  if found then return found end
-end
 end
 
 function util.find_descendants_by_name(gui_element, name, all_found)
-local found = all_found or {}
-for _, child in pairs(gui_element.children)do
-  if child.name == name then
-    table.insert(found, child)
+  local found = all_found or {}
+  for _, child in pairs(gui_element.children) do
+    if child.name == name then
+      table.insert(found, child)
+    end
+    util.find_descendants_by_name(child, name, found)
   end
-  util.find_descendants_by_name(child, name, found)
+  return found
 end
-return found
-end
-
-
 
 return util

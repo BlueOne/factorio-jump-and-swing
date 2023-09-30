@@ -61,7 +61,7 @@ local function level(character)
 end
 
 function MovementConfig.can_grapple_colliding(character)
-  if level(character) >= 2 then return true else return false end
+  if level(character) >= 3 then return true else return false end
 end
 
 function MovementConfig.can_jump_colliding(character)
