@@ -57,6 +57,9 @@ end)
 
 local function level(character)
   if not character then return -1 end
+  if not next(global.MovementConfig.tech_level) then
+    update_all()
+  end
   return global.MovementConfig.tech_level[player_index(character.player)]
 end
 

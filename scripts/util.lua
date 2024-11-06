@@ -200,7 +200,7 @@ Event.on_init(cooldown_on_init)
 function util.start_cooldown(key, duration)
   local value = game.tick + duration
   if not global.cooldowns[key] or global.cooldowns[key] < value then 
-    global.cooldowns[key] = value 
+    global.cooldowns[key] = value
   end
 end
 
